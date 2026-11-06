@@ -661,7 +661,7 @@ function vCategorias() {
       <button class="l" id="ccancel" style="color:var(--mut)" onclick="vCategorias()" hidden>Cancelar</button>
     </div>
     <datalist id="l-nat"><option>Fixa</option><option>Variável</option><option>Investimento</option><option>Venda</option><option>Compra</option><option>Banco</option><option>Emprestimo</option><option>Arrendamento</option><option>Soja</option><option>Parceria</option></datalist>
-    <datalist id="l-sub"><option>Operacional</option><option>Fixa</option><option>Receita</option><option>Compra Gado</option><option>Nutrição</option><option>Banco</option><option>Emprestimos</option><option>Sanidade</option><option>Soja</option><option>Investimentos</option><option>Comissão Compra e Venda Gado</option></datalist>
+    <datalist id="l-sub"><option>Variáveis Operacional</option><option>Fixos</option><option>Receita</option><option>Variáveis Formação/Manut. Pastos/option><option>Variáveis Nutrição Animal</option><option>Banco</option><option>Emprestimos</option><option>Variáveis Sanidade Animal</option><option>Soja</option><option>Investimentos</option></datalist>
     <table><tr><th>Natureza</th><th style="text-align:left">Categoria</th><th style="text-align:left">Subgrupo</th><th>Tipo</th><th></th></tr>
     ${cats.map(c => `<tr><td>${esc(c.natureza)}</td><td style="text-align:left">${esc(c.nome)}${c.ativo ? '' : ' <small>(inativa)</small>'}</td>
       <td style="text-align:left">${esc(c.subgrupo)}</td><td>${c.tipo}</td>
