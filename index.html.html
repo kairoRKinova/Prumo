@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prumo Gestão Financeira</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Bitter:wght@600&display=swap">
+<style>
+/* ===== Login e base: iguais ao original, sem alteração ===== */
+:root{--bg:#eef1ed;--card:#fff;--tx:#1d2620;--mut:#667068;--pri:#1f4d3a;--acc:#b9852a;--bd:#d9dfd8;--bad:#b23a2a}
+@media(prefers-color-scheme:dark){:root{--bg:#121714;--card:#1b231e;--tx:#e6ece7;--mut:#94a198;--pri:#6fbf93;--acc:#d9a64a;--bd:#2c372f;--bad:#e8806e}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+h3{font:600 17px Bitter,Georgia,serif;margin:22px 0 8px}
+input,select{padding:8px 10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit}
+button.p{background:var(--pri);color:#fff;border:0;padding:9px 16px;font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#login{max-width:340px;margin:12vh auto;padding:24px;background:var(--card);border:1px solid var(--bd)}
+#login input{width:100%;margin:6px 0}
+body.entrando{
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#14261c url("fundo-login-elegante.jpg") center/cover no-repeat;
+}
+body.entrando #login{
+  width:100%;
+  margin:0 16px;
+}
+#login{
+  background:color-mix(in srgb,var(--card) 92%,transparent);
+  backdrop-filter:blur(8px);
+  border:1px solid #ffffff22;
+  box-shadow:0 20px 60px #000a;
+}
+
+/* ===== Novo layout: tudo restrito a #app ===== */
+#app{--bg:#06110b;--side:#091a12;--card:#0d1f16;--card2:#102a1d;--bd:#1b3a2a;--tx:#e9f4ed;--mut:#8aa596;--pri:#2fd46f;--pri2:#1a8f4b;--acc:#ffd166;--bad:#ff5a4a;color-scheme:dark;color:var(--tx);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;background:radial-gradient(1200px 600px at 80% -10%,#0f3a26 0,transparent 60%),var(--bg)}
+body:has(#app:not([hidden])){background:#06110b}
+#app .ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+#app aside{display:flex;flex-direction:column;padding:22px 14px;background:linear-gradient(180deg,var(--side),#07140d);border-right:1px solid var(--bd)}
+#app .logo,#app .rodape{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px}
+#app .logo .ic{width:56px;height:56px;color:var(--pri);margin-bottom:4px}
+#app .logo b{font-size:21px;font-weight:700}
+#app .logo small,#app .rodape small{color:var(--mut);font-size:11px}
+#app .rodape .ic{width:56px;height:56px;color:var(--pri)}
+#app .rodape b{font-size:13px}
+#app nav{display:flex;flex-direction:column;gap:6px;margin:34px 0 0}
+#app .rodape{margin-top:auto}
+#app nav button{display:flex;align-items:center;gap:12px;background:none;border:1px solid transparent;border-radius:10px;padding:11px 14px;font:inherit;color:var(--mut);cursor:pointer;text-align:left}
+#app nav button:hover{color:var(--tx)}
+#app nav button.on{color:#fff;font-weight:600;background:linear-gradient(90deg,#14513189,#0d2d1e);border-color:#1f6b42}
+#app nav button.on .ic{color:var(--pri)}
+#app .conteudo{min-width:0}
+#app header{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;padding:20px 28px 6px}
+#app .titulo{display:flex;align-items:center;gap:14px}
+#app .titulo>.ic{width:36px;height:36px;color:var(--pri);stroke-width:2.4}
+#app header h1{margin:0;font-size:26px;font-weight:700;line-height:1.15}
+#app header p{margin:2px 0 0;color:var(--mut)}
+#app .filtro{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#app .filtro label{position:relative;display:flex;align-items:center}
+#app .filtro label .ic{position:absolute;left:11px;color:var(--pri);pointer-events:none;width:16px;height:16px}
+#app .filtro label input{padding-left:34px}
+#app input,#app select{padding:9px 12px;border:1px solid var(--bd);border-radius:10px;background:#0a1810;color:var(--tx);font:inherit}
+#app input[type=date]::-webkit-calendar-picker-indicator{opacity:0;position:absolute;inset:0;width:100%;cursor:pointer}
+#app dialog input[type=date]{position:relative}
+#app dialog label input,#app dialog label select{width:100%}
+#app .filtro button{display:flex;align-items:center;gap:6px;border-radius:10px;padding:9px 14px;font:inherit;cursor:pointer;border:1px solid var(--bd);background:#0a1810;color:var(--tx)}
+#app .filtro button.verde{background:var(--pri);border-color:var(--pri);color:#04210f;font-weight:600}
+#app button:focus-visible,#app input:focus-visible,#app select:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+#app main{padding:14px 28px 40px}
+#app .alerta{--c:var(--bad);margin:0 0 16px;padding:14px 18px;border:2px solid var(--c);border-radius:12px;background:#0b1c13;animation:pisca 1.4s ease-in-out infinite}
+#app .alerta.aviso{--c:#52e07f}
+#app .alerta h4{margin:0 0 4px;font-size:16px;font-weight:700;color:var(--c)}
+#app .alerta ul{margin:0;padding-left:20px}
+@keyframes pisca{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--c) 28%,transparent)}}
+@media(prefers-reduced-motion:reduce){
+#app .alerta{animation:none}
+}
+#app .row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center}
+#app .row select{background:var(--pri);border-color:var(--pri);color:#04210f;font-weight:600}
+#app .row select option{background:#0a1810;color:var(--tx)}
+#app .periodo{color:var(--mut);display:flex;align-items:center;gap:8px}
+#app .bloco{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:16px;margin-bottom:20px}
+#app .card{background:linear-gradient(180deg,var(--card),#0a1a12);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+#app .card h3{display:flex;align-items:center;gap:10px;margin:0;padding:16px 18px 10px;font-size:18px;font-weight:700}
+#app .sinal{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--pri);color:#04210f;font-weight:700}
+#app .sinal.d{background:none;color:var(--bad)}
+#app .scroll{overflow-x:auto}
+#app table{width:100%;border-collapse:collapse}
+#app th,#app td{padding:10px 14px;text-align:right;border-bottom:1px solid #15301f;font-variant-numeric:tabular-nums;white-space:nowrap}
+#app th:first-child,#app td:first-child{text-align:left}
+#app th{font-weight:500;color:var(--mut);font-size:12.5px}
+#app tr.tot td{font-weight:700;background:linear-gradient(90deg,#14513166,#0d2d1e);border-bottom:0}
+#app tr.sec td{background:#0f2a1c;color:var(--pri);font-weight:600;text-align:left;font-size:12.5px}
+#app tr.it td:first-child{padding-left:28px}
+#app tr.sub td{background:#16301f;font-weight:600}
+#app tr.spc td{padding:10px;border:0;background:none}
+#app .neg{color:var(--bad)}
+#app .bar{display:inline-block;width:80px;height:8px;border-radius:4px;background:#1b2b22;vertical-align:middle;margin-right:8px;overflow:hidden}
+#app .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--pri2),var(--pri))}
+#app .bar i.over{background:var(--bad)}
+#app .meta{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px;text-align:center}
+#app .meta svg{width:140px;height:140px}
+#app .meta .pc{font:700 26px "IBM Plex Sans";fill:var(--tx)}
+#app .meta .sm{font:400 12px "IBM Plex Sans";fill:var(--mut)}
+#app .meta p{margin:0;font-weight:600}
+#app .simples table{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+#app button.p{background:var(--pri);color:#04210f;font-weight:600;border:0;border-radius:10px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+#app button.l{background:none;border:0;color:var(--bad);cursor:pointer;font:inherit}
+#app .empty{padding:24px;color:var(--mut)}
+#app tr[data-ids]{cursor:pointer}
+#app tr[data-ids]:hover td{background:#12331f}
+#app dialog{width:min(760px,94vw);max-height:84vh;padding:0;border:1px solid var(--bd);border-radius:14px;background:var(--card);color:var(--tx)}
+#app dialog::backdrop{background:#000a}
+#app dialog .dh{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--bd)}
+#app dialog .dh h3{margin:0;padding:0;font-size:18px}
+#app dialog .dh button{background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);padding:6px 12px;cursor:pointer;font:inherit}
+#app dialog .dc{overflow:auto;max-height:calc(84vh - 66px)}
+@media(max-width:900px){
+#app{grid-template-columns:1fr}
+#app aside{flex-direction:row;align-items:center;padding:10px 14px;border-right:0;border-bottom:1px solid var(--bd)}
+#app .logo small,#app .rodape{display:none}
+#app .logo{flex-direction:row;gap:8px}
+#app .logo .ic{margin:0;width:26px;height:26px}
+#app .logo b{font-size:17px}
+#app nav{flex-direction:row;margin:0;overflow-x:auto}
+#app nav button span{display:none}
+#app header,#app main{padding-left:16px;padding-right:16px}
+#app .bloco{grid-template-columns:1fr}
+#app .meta{flex-direction:row;justify-content:space-around}
+}
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <h3 style="margin-top:0">Entrar</h3>
+  <input id="em" type="email" placeholder="E-mail" autocomplete="username">
+  <input id="pw" type="password" placeholder="Senha" autocomplete="current-password">
+  <button class="p" id="entrar" style="width:100%;margin-top:8px">Entrar</button>
+</div>
+
+<div id="app" hidden>
+  <aside>
+    <div class="logo">
+      <svg class="ic" viewBox="0 0 1324 1188"><path d="M 461,1005 460,1051 467,1077 478,1098 493,1116 511,1130 537,1141 554,1144 752,1145 783,1140 813,1125 837,1103 855,1074 863,1044 862,1009 851,970 832,935 816,924 802,926 783,944 717,956 664,960 610,957 538,944 521,927 506,924 492,933 480,951 468,979 Z M 810,957 812,959 813,963 813,972 812,973 812,978 806,993 796,1006 767,1032 759,1045 758,1056 760,1063 765,1072 772,1080 771,1082 768,1082 755,1075 743,1062 739,1053 739,1047 738,1046 740,1034 742,1029 749,1019 762,1006 784,990 798,977 803,970 808,958 Z M 512,957 514,958 518,968 526,979 537,989 558,1004 575,1021 582,1033 584,1040 584,1050 580,1061 571,1072 557,1081 552,1082 551,1079 558,1071 562,1064 564,1058 563,1044 557,1034 548,1025 541,1020 522,1001 517,994 513,986 509,971 510,959 Z M 9,213 0,250 17,304 112,409 227,432 356,384 380,396 343,411 315,449 362,423 374,477 412,476 428,439 447,466 410,501 364,492 392,665 450,861 445,948 533,859 584,680 579,599 522,403 449,266 503,163 434,189 504,107 535,91 513,128 572,107 554,135 617,105 619,171 672,106 671,145 720,120 776,118 824,138 873,187 805,163 859,273 796,395 732,663 787,863 876,948 872,861 958,493 911,501 877,462 893,439 907,474 941,480 962,459 960,423 1007,449 984,415 942,396 965,384 1089,431 1195,417 1275,351 1323,247 1296,197 1192,164 1109,176 1014,240 982,240 848,108 880,118 818,54 745,27 674,32 592,0 535,10 475,50 419,116 458,103 336,240 161,166 68,178 Z" fill="#2FD46F" fill-rule="evenodd" clip-rule="evenodd"/>
+</svg>
+      <b>Prumo</b><small>Gestão Financeira</small>
+    </div>
+    <nav id="tabs">
+      <button data-t="painel" class="on"><svg class="ic" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Painel</span></button>
+      <button data-t="realizado"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span>Conta corrente</span></button>
+      <button data-t="previsto"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Previsto</span></button>
+      <button data-t="categorias"><svg class="ic" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Plano de contas</span></button>
+      <button data-t="relatorios"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h8"/></svg><span>Relatórios</span></button>
+      <button data-t="resultados"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Resultados</span></button>
+    </nav>
+    <div class="rodape">
+      <svg class="ic" viewBox="0 0 1324 1188"> <path d="M 461,1005 460,1051 467,1077 478,1098 493,1116 511,1130 537,1141 554,1144 752,1145 783,1140 813,1125 837,1103 855,1074 863,1044 862,1009 851,970 832,935 816,924 802,926 783,944 717,956 664,960 610,957 538,944 521,927 506,924 492,933 480,951 468,979 Z M 810,957 812,959 813,963 813,972 812,973 812,978 806,993 796,1006 767,1032 759,1045 758,1056 760,1063 765,1072 772,1080 771,1082 768,1082 755,1075 743,1062 739,1053 739,1047 738,1046 740,1034 742,1029 749,1019 762,1006 784,990 798,977 803,970 808,958 Z M 512,957 514,958 518,968 526,979 537,989 558,1004 575,1021 582,1033 584,1040 584,1050 580,1061 571,1072 557,1081 552,1082 551,1079 558,1071 562,1064 564,1058 563,1044 557,1034 548,1025 541,1020 522,1001 517,994 513,986 509,971 510,959 Z M 9,213 0,250 17,304 112,409 227,432 356,384 380,396 343,411 315,449 362,423 374,477 412,476 428,439 447,466 410,501 364,492 392,665 450,861 445,948 533,859 584,680 579,599 522,403 449,266 503,163 434,189 504,107 535,91 513,128 572,107 554,135 617,105 619,171 672,106 671,145 720,120 776,118 824,138 873,187 805,163 859,273 796,395 732,663 787,863 876,948 872,861 958,493 911,501 877,462 893,439 907,474 941,480 962,459 960,423 1007,449 984,415 942,396 965,384 1089,431 1195,417 1275,351 1323,247 1296,197 1192,164 1109,176 1014,240 982,240 848,108 880,118 818,54 745,27 674,32 592,0 535,10 475,50 419,116 458,103 336,240 161,166 68,178 Z" fill="#2FD46F" fill-rule="evenodd" clip-rule="evenodd"/>
+</svg>
+      <b>Prumo</b><small>Gestão Financeira</small>
+    </div>
+  </aside>
+
+  <div class="conteudo">
+    <header>
+      <div class="titulo">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M5 21v-6M12 21V9M19 21V3"/></svg>
+        <div><h1>Fazenda Carioca</h1><p>Acompanhe o desempenho financeiro do período</p></div>
+      </div>
+      <div class="filtro">
+        <select id="pre" aria-label="Período">
+          <option value="mes">Mês atual</option>
+          <option value="ant">Mês anterior</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="ano">Ano rural atual</option>
+          <option value="custom">Personalizado</option>
+        </select>
+        <label><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><input type="date" id="de" aria-label="De"></label>
+        <label><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><input type="date" id="ate" aria-label="Até"></label>
+        <button class="verde" id="bk"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg>Exportar backup</button>
+        <button id="sair"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Sair</button>
+      </div>
+    </header>
+    <main id="view"></main>
+  </div>
+ 
+  <dialog id="det">
+    <div class="dh"><h3 id="det-t"></h3><button id="det-x">Fechar</button></div>
+    <div class="dc" id="det-c"></div>
+  </dialog>
+    <dialog id="lanc" style="width:min(460px,94vw)">
+    <div class="dh"><h3 id="lanc-t">Novo lançamento</h3><button id="lanc-x">Fechar</button></div>
+    <div class="dc" style="padding:18px;display:grid;gap:12px">
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data<input type="date" id="rd"></label>
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Conta bancária<select id="rcb"></select></label>
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Categoria<select id="rc"></select></label>
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Descrição<input id="rt" placeholder="Descrição"></label>
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Valor<input id="rv" type="number" step="0.01" placeholder="0,00"></label>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="l" style="color:var(--mut)" onclick="$('#lanc').close()">Cancelar</button>
+        <button class="p" id="rbtn" onclick="addReal()">Lançar</button>
+      </div>
+    </div>
+  </dialog>
+    <dialog id="cbd" style="width:min(520px,94vw)">
+    <div class="dh"><h3>Contas bancárias</h3><button id="cbd-x">Fechar</button></div>
+    <div class="dc" style="padding:18px">
+      <div class="row">
+        <input id="cbn" placeholder="Nome da conta">
+        <input id="cbs" type="number" step="0.01" placeholder="Saldo inicial">
+        <button class="p" id="cbbtn" onclick="salvarConta()">Adicionar</button>
+      </div>
+      <div id="cbl"></div>
+    </div>
+  </dialog>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://jsvkqqnifemahspcebhf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_tR25PVC5_p_TZWxQy7TMtw_1-ScKd6S';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+const brl = v => Number(v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hoje = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const ini = () => $('#de').value;
+// fim é exclusivo (dia seguinte ao "Até"), para usar com .lt()
+const fim = () => { const d = new Date($('#ate').value + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+const br = d => d.split('-').reverse().join('/');
+const anoIni = () => { const [y, m] = ini().split('-').map(Number); return m >= 9 ? y : y - 1; };
+const ano = () => anoIni() + '/' + (anoIni() + 1);
+const iniAno = () => anoIni() + '-09-01';
+const fimAno = () => (anoIni() + 1) + '-09-01';
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+function preset(v) {
+  const t = new Date(), y = t.getFullYear(), m = t.getMonth();
+  let a, b;
+  if (v === 'mes') { a = new Date(y, m, 1); b = new Date(y, m + 1, 0); }
+  else if (v === 'ant') { a = new Date(y, m - 1, 1); b = new Date(y, m, 0); }
+  else if (v === '30') { b = t; a = new Date(y, m, t.getDate() - 29); }
+  else if (v === 'ano') { const s = m >= 8 ? y : y - 1; a = new Date(s, 8, 1); b = new Date(s + 1, 7, 31); }
+  else return;
+  $('#de').value = iso(a); $('#ate').value = iso(b);
+}
+// busca todas as linhas (passa de 1000)
+async function todos(q) {
+  let all = [], from = 0;
+  while (true) {
+    const { data, error } = await q().range(from, from + 999);
+    if (error) throw error;
+    all = all.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  return all;
+}
+let cats = [], tab = 'painel', agr = 'nome', busca = '', tBusca, catSel = '';
+const LIMITE_ALERTA = 80; // % do previsto a partir do qual aparece o aviso
+const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const casaCat = c => !busca.trim() || norm(c.nome).includes(norm(busca.trim()));
+const casaLanc = (x, nomeCat) => !busca.trim() || norm(nomeCat).includes(norm(busca.trim())) || norm(x.descricao).includes(norm(busca.trim()));
+const campoBusca = () => `<input id="busca" type="search" placeholder="${tab === 'realizado' ? 'Pesquisar categoria ou descrição...' : 'Pesquisar categoria...'}" value="${esc(busca)}" oninput="buscar(this.value)" style="min-width:220px" aria-label="Pesquisar categoria">`;
+function buscar(v) {
+  busca = v;
+  clearTimeout(tBusca);
+  tBusca = setTimeout(async () => {
+    await (tab === 'painel' ? vPainel() : vRealizado());
+    const i = $('#busca');
+    if (i) { i.focus(); i.setSelectionRange(v.length, v.length); }
+  }, 250);
+}
+
+async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { document.body.classList.add('entrando'); $('#login').hidden = false; return; }
+  $('#app').hidden = false;
+  preset('mes');
+  render();
+}
+$('#entrar').onclick = async () => {
+  const { error } = await db.auth.signInWithPassword({ email: $('#em').value, password: $('#pw').value });
+  error ? alert('Não foi possível entrar: ' + error.message) : location.reload();
+};
+$('#sair').onclick = async () => { await db.auth.signOut(); location.reload(); };
+$('#pre').onchange = e => { preset(e.target.value); render(); };
+['#de', '#ate'].forEach(s => $(s).onchange = () => {
+  $('#pre').value = 'custom';
+  if ($('#de').value && $('#ate').value && $('#de').value > $('#ate').value) {
+    [$('#de').value, $('#ate').value] = [$('#ate').value, $('#de').value];
+  }
+  render();
+});
+$('#tabs').onclick = e => {
+  const b = e.target.closest('button[data-t]');
+  if (!b) return;
+  tab = b.dataset.t;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  render();
+};
+
+async function render() {
+  if (!$('#de').value || !$('#ate').value) return;
+  const [rc, rb] = await Promise.all([
+    db.from('categorias').select('*').order('tipo').order('nome'),
+    db.from('contas_bancarias').select('*').order('nome')
+  ]);
+  if (rc.error) return alert(rc.error.message);
+  if (rb.error) return alert(rb.error.message);
+  cats = rc.data; contas = rb.data;
+  ({ painel: vPainel, realizado: vRealizado, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados })[tab]();
+}
+
+/* ---------- Painel ---------- */
+async function vPainel() {
+  $('#view').className = '';
+  const [p, r, rp] = await Promise.all([
+    db.from('previsto').select('categoria_id,valor').gte('mes', iniAno()).lt('mes', fimAno()),
+    db.from('realizado_mensal').select('categoria_id,mes,total').gte('mes', iniAno()).lt('mes', fimAno()),
+    todos(() => db.from('realizado').select('categoria_id,valor').gte('data', ini()).lt('data', fim()).order('id'))
+  ]);
+  const P = {}, R = {}, M = {};
+  p.data.forEach(x => P[x.categoria_id] = (P[x.categoria_id] || 0) + +x.valor);
+  r.data.forEach(x => R[x.categoria_id] = (R[x.categoria_id] || 0) + +x.total);
+  rp.forEach(x => M[x.categoria_id] = (M[x.categoria_id] || 0) + +x.valor);
+  const sel = v => agr === v ? ' selected' : '';
+  let h = alertas(P, R) + `<div class="row"><select onchange="agr=this.value;vPainel()" aria-label="Agrupamento">
+    <option value="secao"${sel('secao')}>Por seção (modelo planilha)</option>
+    <option value="nome"${sel('nome')}>Agrupar por categoria</option>
+    <option value="natureza"${sel('natureza')}>Agrupar por natureza</option>
+    <option value="subgrupo"${sel('subgrupo')}>Agrupar por subgrupo</option></select>
+    ${campoBusca()}
+    <span class="periodo">Ano rural ${ano()} (set a ago) • Período: ${br(ini())} a ${br($('#ate').value)}</span></div>`;
+
+  const cab = n => `<tr><th>${n}</th><th>Previsto (ano)</th><th>Realizado no período</th><th>Realizado no ano</th><th>Saldo do ano</th><th>Execução</th></tr>`;
+
+  for (const t of ['receita', 'despesa']) {
+    const lista = cats.filter(c => c.tipo === t && c.ativo && casaCat(c));
+    if (!lista.length) continue;
+    let rows = '', tp = 0, tr = 0, tm = 0, cabNome = 'Categoria / Item';
+
+    if (agr === 'secao') {
+      const S = {};
+      lista.forEach(c => { (S[c.subgrupo || '(sem seção)'] ||= []).push(c); });
+      Object.entries(S).forEach(([sec, cs]) => {
+        let sp = 0, sr = 0, sm = 0;
+        rows += `<tr class="sec"><td colspan="6">${esc(sec)}</td></tr>`;
+        cs.forEach(c => {
+          const a = P[c.id] || 0, b = R[c.id] || 0, m = M[c.id] || 0;
+          sp += a; sr += b; sm += m;
+          rows += linha(esc(c.nome), a, b, t, false, m, [c.id]).replace('<tr class=""', '<tr class="it"');
+        });
+        tp += sp; tr += sr; tm += sm;
+        rows += linha('TOTAL ' + esc(sec), sp, sr, t, true, sm, cs.map(c => c.id)).replace('class="tot"', 'class="sub"')
+              + '<tr class="spc"><td colspan="6"></td></tr>';
+      });
+    } else {
+      const G = {};
+      lista.forEach(c => {
+        const k = c[agr] || '(não informado)';
+        G[k] = G[k] || [0, 0, 0, []];
+        G[k][0] += P[c.id] || 0; G[k][1] += R[c.id] || 0; G[k][2] += M[c.id] || 0;
+        G[k][3].push(c.id);
+      });
+      Object.entries(G).forEach(([k, [a, b, m, ids]]) => { tp += a; tr += b; tm += m; rows += linha(esc(k), a, b, t, false, m, ids); });
+      cabNome = agr === 'nome' ? 'Categoria' : agr === 'natureza' ? 'Natureza' : 'Subgrupo';
+    }
+    rows += linha(agr === 'secao' ? 'TOTAL GERAL' : 'Total', tp, tr, t, true, tm, lista.map(c => c.id));    h += bloco(t, `<table>${cab(cabNome)}${rows}</table>`, tp, tr);
+  }
+  $('#view').innerHTML = !cats.some(c => c.ativo)
+    ? '<p class="empty">Cadastre as contas na aba Plano de contas para começar.</p>'
+    : h.includes('class="bloco"') ? h : h + '<p class="empty">Nenhuma categoria encontrada.</p>';
+}
+
+function bloco(t, tabela, tp, tr) {
+  const rec = t === 'receita';
+  const pc = tp > 0 ? tr / tp * 100 : 0;
+  const cor = rec ? (pc >= 100 ? 'var(--pri)' : 'var(--acc)') : (pc >= 100 ? 'var(--bad)' : 'var(--pri)');
+  const txt = rec ? (pc >= 100 ? 'Receitas acima do previsto!' : 'Receitas abaixo do previsto')
+                  : (pc >= 100 ? 'Despesas acima do previsto!' : 'Despesas dentro do planejado');
+  const C = 2 * Math.PI * 52, d = Math.min(pc, 100) / 100 * C;
+  const sinal = rec ? '<span class="sinal">$</span>'
+    : '<svg class="ic sinal d" viewBox="0 0 24 24" style="width:30px;height:30px;padding:3px"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7V6a2 2 0 0 1 2-2h11M16 14h2"/></svg>';
+  return `<section class="bloco">
+    <div class="card"><h3>${sinal}${rec ? 'Receitas' : 'Despesas'}</h3><div class="scroll">${tabela}</div></div>
+    <div class="card meta">
+      <svg viewBox="0 0 120 120" role="img" aria-label="${pc.toFixed(0)}% da meta">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#1b2b22" stroke-width="10"/>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="${cor}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${d} ${C}" transform="rotate(-90 60 60)"/>
+        <text x="60" y="62" text-anchor="middle" class="pc">${pc.toFixed(0)}%</text>
+        <text x="60" y="80" text-anchor="middle" class="sm">da meta</text>
+      </svg>
+      <p style="color:${cor}">${txt}</p>
+    </div></section>`;
+}
+
+function linha(nome, a, b, t, tot, m, ids) {
+  // ids = categorias que esta linha representa (para o detalhe ao clicar)
+  const s = t === 'despesa' ? a - b : b - a;
+  const pc = a > 0 ? b / a * 100 : 0;
+  const over = t === 'despesa' && b > a;
+  const at = ids && ids.length ? ` data-ids="${ids.join(',')}" data-nome="${nome}"` : '';
+  return `<tr class="${tot ? 'tot' : ''}"${at}><td>${nome}</td><td>${brl(a)}</td><td>${brl(m)}</td><td>${brl(b)}</td>
+    <td class="${s < 0 ? 'neg' : ''}">${brl(s)}</td>
+    <td><span class="bar"><i class="${over ? 'over' : ''}" style="width:${Math.min(pc, 100)}%"></i></span>${pc.toFixed(0)}%</td></tr>`;
+}
+
+function alertas(P, R) {
+  const est = [], per = [];
+  cats.filter(c => c.tipo === 'despesa' && c.ativo && (P[c.id] || 0) > 0).forEach(c => {
+    const pc = (R[c.id] || 0) / P[c.id] * 100;
+    const item = `<li><b>${esc(c.nome)}</b>: ${pc.toFixed(0)}% do previsto (${brl(R[c.id] || 0)} de ${brl(P[c.id])})</li>`;
+    if (pc >= 100) est.push(item); else if (pc >= LIMITE_ALERTA) per.push(item);
+  });
+  return (est.length ? `<div class="alerta" role="alert"><h4>⚠ Previsto estourado em ${est.length} conta(s)</h4><ul>${est.join('')}</ul></div>` : '')
+    + (per.length ? `<div class="alerta aviso" role="alert"><h4>Atenção: perto do previsto (${LIMITE_ALERTA}% ou mais)</h4><ul>${per.join('')}</ul></div>` : '');
+}
+
+async function checarAlerta(catId, data) {
+  const [y, m] = data.split('-').map(Number), a = m >= 9 ? y : y - 1;
+  const de = a + '-09-01', ate = (a + 1) + '-09-01';
+  const [p, r] = await Promise.all([
+    db.from('previsto').select('valor').eq('categoria_id', catId).gte('mes', de).lt('mes', ate),
+    db.from('realizado_mensal').select('total').eq('categoria_id', catId).gte('mes', de).lt('mes', ate)
+  ]);
+  const prev = p.data.reduce((s, x) => s + +x.valor, 0), real = r.data.reduce((s, x) => s + +x.total, 0);
+  const c = cats.find(x => x.id === catId);
+  if (!c || c.tipo !== 'despesa' || !prev) return;
+  const pc = real / prev * 100, txt = `${c.nome}: ${brl(real)} de ${brl(prev)} previstos (${pc.toFixed(0)}%) no ano rural ${a}/${a + 1}.`;
+  if (pc >= 100) alert('🚨 PREVISTO ESTOURADO!\n\n' + txt);
+  else if (pc >= LIMITE_ALERTA) alert('⚠ ATENÇÃO: perto do previsto\n\n' + txt);
+}
+
+/* ---------- Realizado ---------- */
+let editId = null, lancs = [], contas = [], contaSel = 'sep', editContaId = null;
+async function vRealizado() {
+  const T = Object.fromEntries(cats.map(c => [c.id, c.tipo]));
+  const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
+  const CB = Object.fromEntries(contas.map(c => [c.id, c.nome]));
+  const de = ini(), ate = fim();
+  const sg = x => (T[x.categoria_id] === 'receita' ? 1 : -1) * +x.valor;
+  const soma = o => Object.values(o).reduce((a, b) => a + b, 0);
+  const neg = v => v < 0 ? ' class="neg"' : '';
+  const cartao = (t, v) => `<div class="card" style="padding:14px 18px;min-width:190px"><small style="color:var(--mut)">${t}</small><div style="font-size:20px;font-weight:700"${neg(v)}>${brl(v)}</div></div>`;
+  const sub = t => `<p style="color:var(--mut);margin:18px 0 6px;font-weight:600">${t}</p>`;
+
+  // tudo até o fim do período (precisa do histórico para o saldo de abertura)
+  const todosLanc = await todos(() => {
+    let s = db.from('realizado').select('*').lt('data', ate);
+    if (contaSel && contaSel !== 'sep') s = s.eq('conta_id', +contaSel);
+    return s.order('data').order('id');
+  });
+
+  lancs = [];
+
+  // monta o relatório de um conjunto de contas
+  const relConta = (escopo, titulo) => {
+    const ids = new Set(escopo.map(c => c.id));
+    const cur = {};
+    escopo.forEach(c => cur[c.id] = +c.saldo_inicial);
+    const periodo = [];
+    todosLanc.filter(x => ids.has(x.conta_id)).forEach(x => {
+      if (x.data < de) cur[x.conta_id] = (cur[x.conta_id] || 0) + sg(x);
+      else periodo.push(x);
+    });
+    const abertura = soma(cur), porConta = escopo.length > 1;
+
+    // saldo dia a dia (só dias com movimento) e saldo após cada lançamento
+    const dias = [];
+    let i = 0;
+    while (i < periodo.length) {
+      const d = periodo[i].data; let e = 0, s = 0;
+      while (i < periodo.length && periodo[i].data === d) {
+        const x = periodo[i++], v = sg(x);
+        cur[x.conta_id] = (cur[x.conta_id] || 0) + v;
+        x.sc = cur[x.conta_id]; x.st = soma(cur);
+        v >= 0 ? e += v : s -= v;
+      }
+      dias.push({ d, e, s, por: { ...cur }, tot: soma(cur) });
+    }
+
+    // lista (respeita busca e categoria; os saldos não mudam com elas)
+    const data = periodo.filter(x => casaLanc(x, N[x.categoria_id]) && (!catSel || x.categoria_id === +catSel));
+    lancs.push(...data);
+
+    const totRec = data.filter(x => T[x.categoria_id] === 'receita').reduce((s, x) => s + +x.valor, 0);
+    const totDes = data.filter(x => T[x.categoria_id] !== 'receita').reduce((s, x) => s + +x.valor, 0);
+    const saldoFinal = abertura + totRec - totDes;
+
+    const cards = escopo.map(c => cartao(esc(c.nome), cur[c.id])).join('') + (porConta ? cartao('Saldo total', soma(cur)) : '');
+
+
+    return `<section style="margin-bottom:34px">
+      ${titulo ? `<h3 style="font-size:20px;color:var(--pri)">${esc(titulo)}</h3>` : ''}
+      <div class="row">${cards}</div>
+      ${sub('Lançamentos')}
+      <div class="scroll"><table><tr><th>Data</th><th style="text-align:left">Conta</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrição</th><th>Receita</th><th>Despesa</th><th>Saldo${porConta ? ' da conta' : ''}</th>${porConta ? '<th>Saldo total</th>' : ''}<th></th></tr>
+      <tr class="sub"><td>${br(de)}</td><td style="text-align:left">${porConta ? 'Todas' : esc(escopo[0] ? escopo[0].nome : '')}</td>
+        <td colspan="2" style="text-align:left">Saldo anterior</td>
+        <td></td><td></td><td${neg(abertura)}><b>${brl(abertura)}</b></td>${porConta ? `<td${neg(abertura)}>${brl(abertura)}</td>` : ''}<td></td></tr>
+      ${data.map(x => `<tr><td>${br(x.data)}</td><td style="text-align:left">${esc(CB[x.conta_id])}</td><td style="text-align:left">${esc(N[x.categoria_id])}</td>
+        <td style="text-align:left">${esc(x.descricao)}</td><td>${T[x.categoria_id] === 'receita' ? brl(x.valor) : ''}</td><td class="neg">${T[x.categoria_id] !== 'receita' ? brl(x.valor) : ''}</td>
+        <td${neg(x.sc)}><b>${brl(x.sc)}</b></td>${porConta ? `<td${neg(x.st)}>${brl(x.st)}</td>` : ''}
+        <td><button class="l" style="color:var(--pri)" onclick="abrirLanc(${x.id})">Editar</button>
+            <button class="l" onclick="delReal(${x.id})">Excluir</button></td></tr>`).join('') || `<tr><td colspan="${porConta ? 9 : 8}" class="empty">Nenhum lançamento neste período.</td></tr>`}
+      <tr class="tot"><td colspan="4">Total (saldo anterior + lançamentos)</td><td>${brl(totRec)}</td><td class="neg">${brl(totDes)}</td>
+        <td${neg(saldoFinal)}>${porConta ? '' : `<b>${brl(saldoFinal)}</b>`}</td>${porConta ? `<td${neg(saldoFinal)}><b>${brl(saldoFinal)}</b></td>` : ''}<td></td></tr></table></div>
+    </section>`;
+  };
+
+  let blocos;
+  if (!contas.length) blocos = '<p class="empty">Cadastre uma conta em "Contas bancárias".</p>';
+  else if (contaSel === 'sep') blocos = contas
+    .filter(c => c.ativo || todosLanc.some(x => x.conta_id === c.id))
+    .map(c => relConta([c], 'Conta: ' + c.nome)).join('');
+  else if (contaSel) blocos = relConta(contas.filter(c => String(c.id) === String(contaSel)), '');
+  else blocos = relConta(contas, contas.length > 1 ? 'Todas as contas juntas' : '');
+
+  const optsF = '<option value="">Todas as categorias</option>' + cats.map(c =>
+    `<option value="${c.id}"${String(c.id) === String(catSel) ? ' selected' : ''}>${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
+  const optsC = `<option value=""${!contaSel ? ' selected' : ''}>Todas as contas juntas</option>
+    <option value="sep"${contaSel === 'sep' ? ' selected' : ''}>Contas separadas</option>` +
+    contas.map(c => `<option value="${c.id}"${String(c.id) === String(contaSel) ? ' selected' : ''}>${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
+
+  $('#view').className = 'simples';
+  $('#view').innerHTML = `
+    <div class="row"><button class="p" onclick="abrirLanc()">+ Novo lançamento</button>
+      <button class="p" style="background:none;border:1px solid var(--bd);color:var(--tx)" onclick="abrirContas()">+ Contas bancárias</button>
+      <select id="fconta" onchange="contaSel=this.value;vRealizado()" aria-label="Conta bancária">${optsC}</select>
+      ${campoBusca()}
+      <select id="fcat" onchange="catSel=this.value;vRealizado()" aria-label="Filtrar por categoria">${optsF}</select></div>
+    ${blocos}`;
+}
+
+function abrirLanc(id) {
+  const x = id ? lancs.find(l => l.id === id) : null;
+  editId = x ? x.id : null;
+  const ativas = cats.filter(c => c.ativo);
+  let opts = ativas.map(c => `<option value="${c.id}">${esc(c.nome)} (${c.tipo})</option>`).join('');
+  if (x && !ativas.some(c => c.id === x.categoria_id)) {
+    const c = cats.find(c => c.id === x.categoria_id);
+    opts += `<option value="${x.categoria_id}">${esc(c ? c.nome : 'Categoria ' + x.categoria_id)} (inativa)</option>`;
+  }
+  $('#rc').innerHTML = opts;
+  $('#rcb').innerHTML = contas.filter(c => c.ativo || (x && x.conta_id === c.id))
+    .map(c => `<option value="${c.id}">${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
+  $('#rcb').value = x ? x.conta_id : ((contaSel && contaSel !== 'sep' ? contaSel : '') || (contas.find(c => c.ativo) || {}).id || '');
+  $('#rd').value = x ? x.data : hoje();
+  if (x) $('#rc').value = x.categoria_id;
+  $('#rt').value = x ? (x.descricao || '') : '';
+  $('#rv').value = x ? x.valor : '';
+  $('#lanc-t').textContent = x ? 'Editar lançamento' : 'Novo lançamento';
+  $('#rbtn').textContent = x ? 'Salvar alteração' : 'Lançar';
+  $('#lanc').showModal();
+  $('#rv').focus();
+}
+
+async function addReal() {
+  const v = parseFloat($('#rv').value);
+  if (!$('#rc').value || !$('#rd').value || !$('#rcb').value || isNaN(v)) return alert('Informe data, conta, categoria e valor.');
+  const catId = +$('#rc').value, dt = $('#rd').value;
+  const payload = { categoria_id: catId, conta_id: +$('#rcb').value, data: dt, descricao: $('#rt').value, valor: v };
+  const { error } = editId
+    ? await db.from('realizado').update(payload).eq('id', editId)
+    : await db.from('realizado').insert(payload);
+  if (error) return alert(error.message);
+  $('#lanc').close();
+  await vRealizado();
+  checarAlerta(catId, dt);
+}
+
+async function delReal(id) {
+  if (!confirm('Excluir este lançamento?')) return;
+  const { error } = await db.from('realizado').delete().eq('id', id);
+  error ? alert(error.message) : vRealizado();
+}
+
+
+function resetContaForm() {
+  editContaId = null;
+  $('#cbn').value = ''; $('#cbs').value = '';
+  $('#cbbtn').textContent = 'Adicionar';
+}
+function listarContas() {
+  $('#cbl').innerHTML = `<table><tr><th>Conta</th><th>Saldo inicial</th><th></th></tr>
+    ${contas.map(c => `<tr><td>${esc(c.nome)}${c.ativo ? '' : ' <small>(inativa)</small>'}</td><td>${brl(c.saldo_inicial)}</td>
+      <td><button class="l" style="color:var(--pri)" onclick="editarConta(${c.id})">Editar</button>
+          <button class="l" onclick="toggleConta(${c.id},${!c.ativo})">${c.ativo ? 'Inativar' : 'Reativar'}</button></td></tr>`).join('')}</table>`;
+}
+function abrirContas() { resetContaForm(); listarContas(); $('#cbd').showModal(); }
+function editarConta(id) {
+  const c = contas.find(x => x.id === id);
+  if (!c) return;
+  editContaId = id;
+  $('#cbn').value = c.nome; $('#cbs').value = c.saldo_inicial;
+  $('#cbbtn').textContent = 'Salvar alteração';
+  $('#cbn').focus();
+}
+async function recarregarContas() {
+  const { data, error } = await db.from('contas_bancarias').select('*').order('nome');
+  if (error) return alert(error.message);
+  contas = data;
+  listarContas();
+  if (tab === 'realizado') vRealizado();
+}
+async function salvarConta() {
+  const nome = $('#cbn').value.trim();
+  if (!nome) return alert('Informe o nome da conta.');
+  const payload = { nome, saldo_inicial: parseFloat($('#cbs').value) || 0 };
+  const { error } = editContaId
+    ? await db.from('contas_bancarias').update(payload).eq('id', editContaId)
+    : await db.from('contas_bancarias').insert(payload);
+  if (error) return alert(error.message);
+  resetContaForm();
+  recarregarContas();
+}
+async function toggleConta(id, ativo) {
+  const { error } = await db.from('contas_bancarias').update({ ativo }).eq('id', id);
+  error ? alert(error.message) : recarregarContas();
+}
+
+/* ---------- Previsto ---------- */
+async function vPrevisto() {
+  const { data } = await db.from('previsto').select('categoria_id,valor').eq('mes', iniAno());
+  const P = Object.fromEntries(data.map(x => [x.categoria_id, x.valor]));
+  $('#view').className = 'simples';
+  $('#view').innerHTML = `<table><tr><th>Categoria</th><th>Previsto de ${ano()}</th></tr>
+    ${cats.filter(c => c.ativo).map(c => `<tr><td>${esc(c.nome)} <small style="color:var(--mut)">(${c.tipo})</small></td>
+      <td><input type="number" step="0.01" data-c="${c.id}" value="${P[c.id] ?? ''}"></td></tr>`).join('')}</table>
+    <p><button class="p" onclick="salvarPrev()">Salvar previsto</button></p>`;
+}
+async function salvarPrev() {
+  const rows = [...document.querySelectorAll('[data-c]')].filter(i => i.value !== '')
+    .map(i => ({ categoria_id: +i.dataset.c, mes: iniAno(), valor: +i.value }));
+  const { error } = await db.from('previsto').upsert(rows, { onConflict: 'categoria_id,mes' });
+  error ? alert(error.message) : alert('Previsto salvo.');
+}
+
+/* ---------- Categorias ---------- */
+let editCatId = null;
+function vCategorias() {
+  editCatId = null;
+  $('#view').className = 'simples';
+  $('#view').innerHTML = `
+    <div class="row">
+      <select id="ct"><option value="despesa">Despesa</option><option value="receita">Receita</option></select>
+      <input id="cg" list="l-nat" placeholder="Natureza">
+      <input id="cn" placeholder="Categoria">
+      <input id="cs" list="l-sub" placeholder="Subgrupo">
+      <button class="p" id="cbtn" onclick="addCat()">Adicionar</button>
+      <button class="l" id="ccancel" style="color:var(--mut)" onclick="vCategorias()" hidden>Cancelar</button>
+    </div>
+    <datalist id="l-nat"><option>Fixa</option><option>Variável</option><option>Investimento</option><option>Venda</option><option>Compra</option><option>Banco</option><option>Emprestimo</option><option>Arrendamento</option><option>Soja</option><option>Parceria</option></datalist>
+    <datalist id="l-sub"><option>Variáveis Operacional</option><option>Fixos</option><option>Receita</option><option>Variáveis Formação/Manut. Pastos/option><option>Variáveis Nutrição Animal</option><option>Banco</option><option>Emprestimos</option><option>Variáveis Sanidade Animal</option><option>Soja</option><option>Investimentos</option></datalist>
+    <table><tr><th>Natureza</th><th style="text-align:left">Categoria</th><th style="text-align:left">Subgrupo</th><th>Tipo</th><th></th></tr>
+    ${cats.map(c => `<tr><td>${esc(c.natureza)}</td><td style="text-align:left">${esc(c.nome)}${c.ativo ? '' : ' <small>(inativa)</small>'}</td>
+      <td style="text-align:left">${esc(c.subgrupo)}</td><td>${c.tipo}</td>
+      <td><button class="l" style="color:var(--pri)" onclick="editCat(${c.id})">Editar</button>
+          <button class="l" onclick="toggleCat(${c.id},${!c.ativo})">${c.ativo ? 'Inativar' : 'Reativar'}</button></td></tr>`).join('')}</table>`;
+}
+async function addCat() {
+  const nome = $('#cn').value.trim();
+  if (!nome) return;
+  const payload = {
+    nome, tipo: $('#ct').value,
+    natureza: $('#cg').value.trim() || null,
+    subgrupo: $('#cs').value.trim() || null
+  };
+  const { error } = editCatId
+    ? await db.from('categorias').update(payload).eq('id', editCatId)
+    : await db.from('categorias').insert(payload);
+  error ? alert(error.message) : render();
+}
+function editCat(id) {
+  const c = cats.find(x => x.id === id);
+  if (!c) return;
+  editCatId = id;
+  $('#ct').value = c.tipo;
+  $('#cg').value = c.natureza || '';
+  $('#cn').value = c.nome;
+  $('#cs').value = c.subgrupo || '';
+  $('#cbtn').textContent = 'Salvar alteração';
+  $('#ccancel').hidden = false;
+  $('#cn').focus();
+}
+async function toggleCat(id, ativo) {
+  const { error } = await db.from('categorias').update({ ativo }).eq('id', id);
+  error ? alert(error.message) : render();
+}
+
+/* ---------- Relatórios ---------- */
+let repSel = 'sep';
+function vRelatorios() {
+  $('#view').className = 'simples';
+  const opts = `<option value="sep"${repSel === 'sep' ? ' selected' : ''}>Cada conta separada (uma por página)</option>
+    <option value="juntas"${repSel === 'juntas' ? ' selected' : ''}>Todas as contas juntas</option>` +
+    contas.map(c => `<option value="${c.id}"${String(c.id) === repSel ? ' selected' : ''}>${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
+  $('#view').innerHTML = `
+    <div class="card" style="max-width:560px;padding:20px;display:grid;gap:12px">
+      <h3 style="padding:0">Contas bancárias</h3>
+      <p style="margin:0;color:var(--mut)">Extrato com saldo anterior, receitas, despesas e saldo após cada lançamento, no período ${br(ini())} a ${br($('#ate').value)} (o mesmo filtro de datas do topo).</p>
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Contas<select id="rp-conta">${opts}</select></label>
+      <div><button class="p" id="rp-pdf" onclick="gerarPdfContas()">Gerar PDF</button></div>
+    </div>`;
+}
+
+
+let logoCache = null;
+function logoPng(cor = '#1f4d3a') {
+  if (logoCache) return Promise.resolve(logoCache);
+  const d = document.querySelector('.logo svg path').getAttribute('d');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1324 1188" width="662" height="594"><path d="${d}" fill="${cor}" fill-rule="evenodd"/></svg>`;
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = 662; c.height = 594;
+      c.getContext('2d').drawImage(img, 0, 0, 662, 594);
+      res(logoCache = c.toDataURL('image/png'));
+    };
+    img.onerror = () => rej(new Error('Não foi possível carregar o logo'));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+async function gerarPdfContas() {
+  const btn = $('#rp-pdf');
+  btn.disabled = true; btn.textContent = 'Gerando...';
+  try {
+    const sel = $('#rp-conta').value;
+    repSel = sel;
+    const { jsPDF } = window.jspdf;
+    const T = Object.fromEntries(cats.map(c => [c.id, c.tipo]));
+    const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
+    const CB = Object.fromEntries(contas.map(c => [c.id, c.nome]));
+    const de = ini(), ate = fim(), ateTxt = $('#ate').value;
+    const m = v => brl(v).replace(/\u00a0/g, ' ');
+    const soma = o => Object.values(o).reduce((a, b) => a + b, 0);
+    const sg = x => (T[x.categoria_id] === 'receita' ? 1 : -1) * +x.valor;
+
+    const lanc = await todos(() => {
+      let s = db.from('realizado').select('*').lt('data', ate);
+      if (sel !== 'sep' && sel !== 'juntas') s = s.eq('conta_id', +sel);
+      return s.order('data').order('id');
+    });
+
+    const grupos = sel === 'sep'
+      ? contas.filter(c => c.ativo || lanc.some(x => x.conta_id === c.id)).map(c => [c])
+      : sel === 'juntas' ? [contas] : [contas.filter(c => String(c.id) === sel)];
+    if (!grupos.length || !grupos[0].length) return alert('Nenhuma conta para gerar o relatório.');
+
+    const logo = await logoPng();
+    const nomeFaz = document.querySelector('.logo b').textContent;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    grupos.forEach((escopo, gi) => {
+      if (gi) doc.addPage();
+      const ids = new Set(escopo.map(c => c.id));
+      const juntas = escopo.length > 1;
+      const cur = {};
+      escopo.forEach(c => cur[c.id] = +c.saldo_inicial);
+      const per = [];
+      lanc.filter(x => ids.has(x.conta_id)).forEach(x => {
+        if (x.data < de) cur[x.conta_id] += sg(x); else per.push(x);
+      });
+      const abertura = soma(cur);
+      let tr = 0, td = 0;
+      const body = [[br(de), ...(juntas ? ['Todas'] : []), '', 'Saldo anterior', '', '', m(abertura)]];
+      per.forEach(x => {
+        const rec = T[x.categoria_id] === 'receita';
+        cur[x.conta_id] += sg(x);
+        rec ? tr += +x.valor : td += +x.valor;
+        body.push([br(x.data), ...(juntas ? [CB[x.conta_id]] : []), N[x.categoria_id] || '', x.descricao || '',
+          rec ? m(x.valor) : '', rec ? '' : m(x.valor), m(soma(cur))]);
+      });
+      body.push(['', ...(juntas ? [''] : []), '', 'Total (saldo anterior + lançamentos)', m(tr), m(td), m(abertura + tr - td)]);
+
+      const titulo = juntas ? 'Todas as contas juntas' : 'Conta: ' + escopo[0].nome;
+      const n = juntas ? 7 : 6;
+      doc.addImage(logo, 'PNG', 40, 26, 50, 45);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text(nomeFaz, 100, 46);
+      const wPrumo = doc.getTextWidth(nomeFaz);   // <-- linha nova
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
+      doc.text('- Gestão Financeira', 100 + wPrumo + 6, 46);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.text('Extrato de contas bancárias', 100, 62);      doc.setDrawColor(31, 77, 58); doc.line(40, 80, doc.internal.pageSize.getWidth() - 40, 80);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(titulo, 40, 98);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(`Período: ${br(de)} a ${br(ateTxt)}`, 40, 114);
+
+      doc.autoTable({
+        startY: 126,
+        head: [['Data', ...(juntas ? ['Conta'] : []), 'Categoria', 'Descrição', 'Receita', 'Despesa', 'Saldo']],
+        body,
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [31, 77, 58] },
+        didParseCell: d => {
+          if (d.column.index >= n - 3) d.cell.styles.halign = 'right';
+          if (d.section === 'body') {
+            if (d.column.index === n - 2) d.cell.styles.textColor = [178, 58, 42];
+            if (d.row.index === 0 || d.row.index === body.length - 1) {
+              d.cell.styles.fontStyle = 'bold';
+              d.cell.styles.fillColor = [230, 238, 233];
+            }
+          }
+        }
+      });
+    });
+
+    const pags = doc.getNumberOfPages();
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    for (let i = 1; i <= pags; i++) {
+      doc.setPage(i); doc.setFontSize(8);
+      doc.text(`Página ${i} de ${pags}  -  gerado em ${br(hoje())}`, W - 40, H - 20, { align: 'right' });
+    }
+    doc.save(`Fazenda Carioca - ${de}_a_${ateTxt}.pdf`);
+  } catch (err) {
+    alert('Não foi possível gerar o PDF: ' + (err.message || err));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Gerar PDF';
+  }
+}
+
+/* ---------- Resultados (dashboard) ---------- */
+const curto = v => Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi'
+  : Math.abs(v) >= 1e3 ? Math.round(v / 1e3) + ' mil' : String(Math.round(v));
+
+function graficoBarras(meses, series) {
+  const W = 900, H = 300, L = 64, R = 10, Tp = 12, B = 34;
+  const n = meses.length, gw = (W - L - R) / n;
+  const max = Math.max(1, ...series.flatMap(s => s.vals));
+  const bw = Math.min(30, gw * 0.8 / series.length);
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = Tp + (H - Tp - B) * (1 - i / 4), v = max * i / 4;
+    g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#1b3a2a"/><text x="${L - 8}" y="${y + 4}" text-anchor="end" fill="#8aa596" font-size="11">${curto(v)}</text>`;
+  }
+  meses.forEach((k, i) => {
+    const x0 = L + gw * i + (gw - bw * series.length) / 2;
+    series.forEach((s, j) => {
+      const h = (H - Tp - B) * s.vals[i] / max;
+      g += `<rect x="${x0 + bw * j}" y="${H - B - h}" width="${bw - 2}" height="${Math.max(h, 0)}" rx="3" fill="${s.cor}"><title>${s.nome} - ${k.slice(5)}/${k.slice(2, 4)}: ${brl(s.vals[i])}</title></rect>`;
+    });
+    if (n <= 16 || i % 2 === 0) g += `<text x="${L + gw * i + gw / 2}" y="${H - 12}" text-anchor="middle" fill="#8aa596" font-size="11">${k.slice(5)}/${k.slice(2, 4)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Receitas, despesas e investimentos por mês">${g}</svg>`;
+}
+
+function ranking(titulo, mapa, cor) {
+  const itens = Object.entries(mapa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const tot = itens.reduce((s, [, v]) => s + v, 0);
+  const lin = itens.slice(0, 8).map(([k, v]) => `<div style="margin:10px 0">
+      <div style="display:flex;justify-content:space-between;gap:10px"><span>${esc(k)}</span><span>${brl(v)} <small style="color:var(--mut)">${(v / tot * 100).toFixed(0)}%</small></span></div>
+      <div style="height:8px;border-radius:4px;background:#1b2b22;margin-top:4px;overflow:hidden"><i style="display:block;height:100%;width:${v / tot * 100}%;background:${cor};border-radius:4px"></i></div></div>`).join('');
+  const resto = itens.length > 8 ? `<small style="color:var(--mut)">+ ${itens.length - 8} outros</small>` : '';
+  return `<div class="card" style="padding:16px 18px"><b>${titulo}</b>${lin || '<p style="color:var(--mut);margin:12px 0 0">Sem movimento no período.</p>'}${resto}</div>`;
+}
+
+const PALETA = ['#2fd46f', '#ffd166', '#4cc9f0', '#ff5a4a', '#b388ff', '#ff9f43', '#5eead4', '#f472b6'];
+function rosca(titulo, mapa) {
+  let itens = Object.entries(mapa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const total = itens.reduce((s, [, v]) => s + v, 0);
+  if (!total) return `<div class="card" style="padding:16px 18px"><b>${titulo}</b><p style="color:var(--mut);margin:12px 0 0">Sem movimento no período.</p></div>`;
+  if (itens.length > 8) {
+    const resto = itens.slice(7).reduce((s, [, v]) => s + v, 0);
+    itens = [...itens.slice(0, 7), ['Outros', resto]];
+  }
+  const R = 70, C = 2 * Math.PI * R;
+  let acc = 0, arcos = '', leg = '';
+  itens.forEach(([k, v], i) => {
+    const f = v / total, cor = PALETA[i % PALETA.length];
+    arcos += `<circle cx="100" cy="100" r="${R}" fill="none" stroke="${cor}" stroke-width="28" stroke-dasharray="${f * C} ${C}" stroke-dashoffset="${-acc * C}" transform="rotate(-90 100 100)"><title>${esc(k)}: ${brl(v)} (${(f * 100).toFixed(1)}%)</title></circle>`;
+    acc += f;
+    leg += `<div style="display:flex;align-items:center;gap:8px;margin:5px 0">
+      <i style="width:10px;height:10px;border-radius:3px;background:${cor};flex:none"></i>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</span>
+      <span style="white-space:nowrap">${brl(v)} <small style="color:var(--mut)">${(f * 100).toFixed(0)}%</small></span></div>`;
+  });
+  return `<div class="card" style="padding:16px 18px"><b>${titulo}</b>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:10px">
+      <svg viewBox="0 0 200 200" style="width:190px;height:190px;flex:none" role="img" aria-label="${titulo}">${arcos}
+        <text x="100" y="98" text-anchor="middle" fill="#e9f4ed" font-size="17" font-weight="700">R$ ${curto(total)}</text>
+        <text x="100" y="116" text-anchor="middle" fill="#8aa596" font-size="11">total</text>
+      </svg>
+      <div style="flex:1;min-width:200px">${leg}</div>
+    </div></div>`;
+}
+
+async function vResultados() {
+  $('#view').className = '';
+  const [p, rm, rows] = await Promise.all([
+    db.from('previsto').select('categoria_id,valor').gte('mes', iniAno()).lt('mes', fimAno()),
+    db.from('realizado_mensal').select('categoria_id,total').gte('mes', iniAno()).lt('mes', fimAno()),
+    todos(() => db.from('realizado').select('categoria_id,conta_id,data,valor').lt('data', fim()).order('id'))
+  ]);
+  if (p.error) return alert(p.error.message);
+  if (rm.error) return alert(rm.error.message);
+
+  const C = Object.fromEntries(cats.map(c => [c.id, c]));
+  // rec = receita | inv = despesa de investimento | des = demais despesas
+  const gr = id => {
+    const c = C[id];
+    if (!c) return 'des';
+    if (c.tipo === 'receita') return 'rec';
+    return norm(c.natureza).startsWith('invest') || norm(c.subgrupo).startsWith('invest') ? 'inv' : 'des';
+  };
+  const de = ini(), ateTxt = $('#ate').value;
+  const tot = { rec: 0, des: 0, inv: 0 };
+  const mes = {};
+  const rk = { rec: {}, des: {}, inv: {} };
+  const pcat = { rec: {}, des: {} };
+  const saldoConta = Object.fromEntries(contas.map(c => [c.id, +c.saldo_inicial]));
+
+  rows.forEach(x => {
+    const g = gr(x.categoria_id), v = +x.valor;
+    saldoConta[x.conta_id] = (saldoConta[x.conta_id] || 0) + (g === 'rec' ? v : -v);
+    if (x.data < de) return;
+    tot[g] += v;
+    (mes[x.data.slice(0, 7)] ||= { rec: 0, des: 0, inv: 0 })[g] += v;
+    const c = C[x.categoria_id];
+    const nome = g === 'des' ? ((c && c.subgrupo) || '(sem subgrupo)') : (c ? c.nome : '?');
+    rk[g][nome] = (rk[g][nome] || 0) + v;
+    if (g !== 'inv') { const cn = c ? c.nome : '?'; pcat[g][cn] = (pcat[g][cn] || 0) + v; }
+  });
+
+  // previsto x realizado do ano rural
+  const pa = { rec: 0, des: 0, inv: 0 }, ra = { rec: 0, des: 0, inv: 0 };
+  p.data.forEach(x => pa[gr(x.categoria_id)] += +x.valor);
+  rm.data.forEach(x => ra[gr(x.categoria_id)] += +x.total);
+
+  // meses do período
+  const meses = [];
+  let [y, mm] = de.slice(0, 7).split('-').map(Number);
+  const fimM = ateTxt.slice(0, 7);
+  for (;;) {
+    const k = `${y}-${String(mm).padStart(2, '0')}`;
+    meses.push(k);
+    if (k >= fimM || meses.length > 120) break;
+    if (++mm > 12) { mm = 1; y++; }
+  }
+  const serie = g => meses.map(k => (mes[k] || {})[g] || 0);
+
+  const res = tot.rec - tot.des - tot.inv, resOp = tot.rec - tot.des;
+  const margem = tot.rec > 0 ? res / tot.rec * 100 : 0;
+  const caixa = Object.values(saldoConta).reduce((a, b) => a + b, 0);
+  const kpi = (t, v, cor, nota) => `<div class="card" style="padding:16px 18px"><small style="color:var(--mut)">${t}</small>
+    <div style="font-size:24px;font-weight:700;color:${cor}">${brl(v)}</div><small style="color:var(--mut)">${nota || '&nbsp;'}</small></div>`;
+
+  const linhaPR = (nome, g) => {
+    const a = pa[g], b = ra[g], s = g === 'rec' ? b - a : a - b, pc = a > 0 ? b / a * 100 : 0;
+    return `<tr><td>${nome}</td><td>${brl(a)}</td><td>${brl(b)}</td><td class="${s < 0 ? 'neg' : ''}">${brl(s)}</td>
+      <td><span class="bar"><i class="${g !== 'rec' && b > a ? 'over' : ''}" style="width:${Math.min(pc, 100)}%"></i></span>${pc.toFixed(0)}%</td></tr>`;
+  };
+  const resA = pa.rec - pa.des - pa.inv, resB = ra.rec - ra.des - ra.inv;
+
+  const cartoesConta = contas.filter(c => c.ativo || Math.abs(saldoConta[c.id] - c.saldo_inicial) > 0.004)
+    .map(c => kpi(esc(c.nome), saldoConta[c.id], saldoConta[c.id] < 0 ? 'var(--bad)' : 'var(--tx)')).join('');
+
+  $('#view').innerHTML = `
+    <div class="row"><span class="periodo">Período: ${br(de)} a ${br(ateTxt)} • Ano rural ${ano()}</span></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:18px">
+      ${kpi('Receitas', tot.rec, 'var(--pri)')}
+      ${kpi('Despesas', tot.des, 'var(--bad)', 'sem investimentos')}
+      ${kpi('Investimentos', tot.inv, 'var(--acc)')}
+      ${kpi('Resultado', res, res >= 0 ? 'var(--pri)' : 'var(--bad)', `Operacional: ${brl(resOp)} • margem ${margem.toFixed(0)}%`)}
+      ${kpi('Saldo em caixa', caixa, caixa < 0 ? 'var(--bad)' : 'var(--tx)', `todas as contas em ${br(ateTxt)}`)}
+    </div>
+
+    <div class="card" style="padding:16px 18px;margin-bottom:18px">
+      <b>Receitas x despesas x investimentos por mês</b>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin:8px 0;color:var(--mut)">
+        <span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2fd46f"></i> Receitas</span>
+        <span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#ff5a4a"></i> Despesas</span>
+        <span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#ffd166"></i> Investimentos</span>
+      </div>
+      ${graficoBarras(meses, [
+        { nome: 'Receitas', cor: '#2fd46f', vals: serie('rec') },
+        { nome: 'Despesas', cor: '#ff5a4a', vals: serie('des') },
+        { nome: 'Investimentos', cor: '#ffd166', vals: serie('inv') }
+      ])}
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin-bottom:18px">
+      ${rosca('Receitas por categoria', pcat.rec)}
+      ${rosca('Despesas por categoria', pcat.des)}
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px">
+      ${ranking('Receitas por categoria', rk.rec, '#2fd46f')}
+      ${ranking('Despesas por subgrupo', rk.des, '#ff5a4a')}
+      ${ranking('Investimentos por categoria', rk.inv, '#ffd166')}
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <h3>Previsto x realizado no ano rural ${ano()}</h3>
+      <div class="scroll"><table>
+        <tr><th>Grupo</th><th>Previsto (ano)</th><th>Realizado (ano)</th><th>Saldo</th><th>Execução</th></tr>
+        ${linhaPR('Receitas', 'rec')}${linhaPR('Despesas', 'des')}${linhaPR('Investimentos', 'inv')}
+        <tr class="tot"><td>Resultado</td><td>${brl(resA)}</td><td>${brl(resB)}</td><td class="${resB - resA < 0 ? 'neg' : ''}">${brl(resB - resA)}</td><td></td></tr>
+      </table></div>
+    </div>
+
+    <div class="card" style="padding:16px 18px">
+      <b>Saldo por conta bancária em ${br(ateTxt)}</b>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:12px">${cartoesConta || '<span style="color:var(--mut)">Nenhuma conta cadastrada.</span>'}</div>
+    </div>`;
+}
+
+/* ---------- Detalhe ao clicar no Painel ---------- */
+$('#view').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-ids]');
+  if (!tr) return;
+  detalhe(tr.dataset.ids.split(',').map(Number), tr.dataset.nome);
+});
+$('#det-x').onclick = () => $('#det').close();
+$('#det').addEventListener('click', e => { if (e.target.id === 'det') $('#det').close(); });
+$('#lanc-x').onclick = () => $('#lanc').close();
+$('#lanc').addEventListener('click', e => { if (e.target.id === 'lanc') $('#lanc').close(); });
+$('#lanc').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') addReal(); });
+$('#cbd-x').onclick = () => $('#cbd').close();
+$('#cbd').addEventListener('click', e => { if (e.target.id === 'cbd') $('#cbd').close(); });
+
+
+async function detalhe(ids, titulo) {
+  let data;
+  try {
+    data = await todos(() => db.from('realizado').select('*')
+      .in('categoria_id', ids).gte('data', ini()).lt('data', fim())
+      .order('data', { ascending: false }).order('id'));
+  } catch (err) { return alert(err.message); }
+  const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
+  const total = data.reduce((s, x) => s + +x.valor, 0);
+  $('#det-t').textContent = `${titulo} • ${br(ini())} a ${br($('#ate').value)}`;
+  $('#det-c').innerHTML = data.length
+    ? `<table><tr><th>Data</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrição</th><th>Valor</th></tr>
+       ${data.map(x => `<tr><td>${br(x.data)}</td><td style="text-align:left">${esc(N[x.categoria_id])}</td>
+         <td style="text-align:left">${esc(x.descricao)}</td><td>${brl(x.valor)}</td></tr>`).join('')}
+       <tr class="tot"><td colspan="3">Total (${data.length} lançamento${data.length > 1 ? 's' : ''})</td><td>${brl(total)}</td></tr></table>`
+    : '<p class="empty">Nenhum lançamento neste período.</p>';
+  $('#det').showModal();
+}
+
+/* ---------- Backup ---------- */
+$('#bk').onclick = async () => {
+  const out = { gerado_em: new Date().toISOString() };
+  for (const t of ['categorias', 'previsto', 'realizado', 'contas_bancarias']) {
+    let all = [], from = 0;
+    while (true) {
+      const { data, error } = await db.from(t).select('*').order('id').range(from, from + 999);
+      if (error) return alert(error.message);
+      all = all.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    out[t] = all;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' }));
+  a.download = `backup-${hoje()}.json`;
+  a.click();
+};
+
+init();
+</script>
+</body>
+</html>
