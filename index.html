@@ -596,7 +596,7 @@ function abrirLanc(id) {
   $('#lanc-t').textContent = x ? 'Editar lançamento' : 'Novo lançamento';
   $('#rbtn').textContent = x ? 'Salvar alteração' : 'Lançar';
   $('#lanc').showModal();
-  (x ? $('#rv') : $('#rc')).focus();
+  (x ? $('#rv') : $('#rd')).focus();
 }
 
 async function addReal() {
@@ -614,13 +614,13 @@ async function addReal() {
   if (continuar) {
     // mantém data e conta; limpa o resto para o próximo lançamento
     $('#rc').value = ''; $('#rt').value = ''; $('#rv').value = '';
-    $('#rc').focus();
+    $('#rd').focus();
   } else {
     $('#lanc').close();
   }
   await vRealizado();
   await checarAlerta(catId, dt);
-  if (continuar) $('#rc').focus();
+  if (continuar) $('#rd').focus();
 }
 
 async function delReal(id) {
