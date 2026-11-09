@@ -200,7 +200,10 @@ body:has(#app:not([hidden])){background:#06110b}
     <div class="dc" style="padding:18px;display:grid;gap:12px">
       <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data<input type="date" id="rd"></label>
       <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Conta bancária<select id="rcb"></select></label>
-      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Categoria<select id="rc"></select></label>
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Categoria
+  <input id="rc" list="rc-list" placeholder="Digite para pesquisar..." autocomplete="off">
+  <datalist id="rc-list"></datalist>
+</label>
       <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Descrição<input id="rt" placeholder="Descrição"></label>
       <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Valor<input id="rv" type="number" step="0.01" placeholder="0,00"></label>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
@@ -564,41 +567,60 @@ async function vRealizado() {
     ${blocos}`;
 }
 
+let mapaCat = {};   // texto exibido -> id da categoria
+function catPorTexto(t) {
+  t = norm((t || '').trim());
+  if (!t) return null;
+  const achou = Object.entries(mapaCat).find(([k]) => norm(k) === t);
+  return achou ? { id: achou[1] } : null;
+}
+
 function abrirLanc(id) {
   const x = id ? lancs.find(l => l.id === id) : null;
   editId = x ? x.id : null;
   const ativas = cats.filter(c => c.ativo);
-  let opts = ativas.map(c => `<option value="${c.id}">${esc(c.nome)} (${c.tipo})</option>`).join('');
+  mapaCat = {};
+  ativas.forEach(c => mapaCat[`${c.nome} (${c.tipo})`] = c.id);
   if (x && !ativas.some(c => c.id === x.categoria_id)) {
     const c = cats.find(c => c.id === x.categoria_id);
-    opts += `<option value="${x.categoria_id}">${esc(c ? c.nome : 'Categoria ' + x.categoria_id)} (inativa)</option>`;
+    mapaCat[`${c ? c.nome : 'Categoria ' + x.categoria_id} (inativa)`] = x.categoria_id;
   }
-  $('#rc').innerHTML = opts;
+  $('#rc-list').innerHTML = Object.keys(mapaCat).map(k => `<option value="${esc(k)}">`).join('');
   $('#rcb').innerHTML = contas.filter(c => c.ativo || (x && x.conta_id === c.id))
     .map(c => `<option value="${c.id}">${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
   $('#rcb').value = x ? x.conta_id : ((contaSel && contaSel !== 'sep' ? contaSel : '') || (contas.find(c => c.ativo) || {}).id || '');
   $('#rd').value = x ? x.data : hoje();
-  if (x) $('#rc').value = x.categoria_id;
+  $('#rc').value = x ? (Object.keys(mapaCat).find(k => mapaCat[k] === x.categoria_id) || '') : '';
   $('#rt').value = x ? (x.descricao || '') : '';
   $('#rv').value = x ? x.valor : '';
   $('#lanc-t').textContent = x ? 'Editar lançamento' : 'Novo lançamento';
   $('#rbtn').textContent = x ? 'Salvar alteração' : 'Lançar';
   $('#lanc').showModal();
-  $('#rv').focus();
+  (x ? $('#rv') : $('#rc')).focus();
 }
 
 async function addReal() {
   const v = parseFloat($('#rv').value);
-  if (!$('#rc').value || !$('#rd').value || !$('#rcb').value || isNaN(v)) return alert('Informe data, conta, categoria e valor.');
-  const catId = +$('#rc').value, dt = $('#rd').value;
+  const cat = catPorTexto($('#rc').value);
+  if (!cat || !$('#rd').value || !$('#rcb').value || isNaN(v)) return alert('Informe data, conta, categoria (escolha uma da lista) e valor.');
+  const catId = cat.id, dt = $('#rd').value;
   const payload = { categoria_id: catId, conta_id: +$('#rcb').value, data: dt, descricao: $('#rt').value, valor: v };
   const { error } = editId
     ? await db.from('realizado').update(payload).eq('id', editId)
     : await db.from('realizado').insert(payload);
   if (error) return alert(error.message);
-  $('#lanc').close();
+
+  const continuar = !editId;   // novo lançamento: continua na tela; edição: fecha
+  if (continuar) {
+    // mantém data e conta; limpa o resto para o próximo lançamento
+    $('#rc').value = ''; $('#rt').value = ''; $('#rv').value = '';
+    $('#rc').focus();
+  } else {
+    $('#lanc').close();
+  }
   await vRealizado();
-  checarAlerta(catId, dt);
+  await checarAlerta(catId, dt);
+  if (continuar) $('#rc').focus();
 }
 
 async function delReal(id) {
@@ -1049,7 +1071,23 @@ $('#det-x').onclick = () => $('#det').close();
 $('#det').addEventListener('click', e => { if (e.target.id === 'det') $('#det').close(); });
 $('#lanc-x').onclick = () => $('#lanc').close();
 $('#lanc').addEventListener('click', e => { if (e.target.id === 'lanc') $('#lanc').close(); });
-$('#lanc').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') addReal(); });
+const ordemLanc = ['rd', 'rcb', 'rc', 'rt', 'rv'];
+$('#lanc').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const i = ordemLanc.indexOf(e.target.id);
+  if (i < 0) return;                       // botões etc.: comportamento normal
+
+  if (e.target.id === 'rc') {
+    // categoria: só avança se o texto bater com uma categoria da lista
+    // (setTimeout espera o navegador aplicar a sugestão escolhida)
+    setTimeout(() => { if (catPorTexto($('#rc').value)) $('#rt').focus(); }, 0);
+    return;
+  }
+
+  e.preventDefault();
+  if (i === ordemLanc.length - 1) addReal();   // último campo (Valor): lança
+  else $('#' + ordemLanc[i + 1]).focus();      // demais: vai para o próximo
+});
 $('#cbd-x').onclick = () => $('#cbd').close();
 $('#cbd').addEventListener('click', e => { if (e.target.id === 'cbd') $('#cbd').close(); });
 
