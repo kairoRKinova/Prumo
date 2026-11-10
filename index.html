@@ -283,7 +283,9 @@ const ORDEM_SECOES = [
   'Soja',
   'Emprestimos'
 ];
-const posSecao = s => { const i = ORDEM_SECOES.findIndex(o => norm(o) === norm(s)); return i < 0 ? 999 : i; };const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const posSecao = s => { const i = ORDEM_SECOES.findIndex(o => norm(o) === norm(s)); return i < 0 ? 999 : i; };
+const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const ehTransf = c => !!c && norm(c.natureza).startsWith('transfer');
 const casaCat = c => !busca.trim() || norm(c.nome).includes(norm(busca.trim()));
 const casaLanc = (x, nomeCat) => !busca.trim() || norm(nomeCat).includes(norm(busca.trim())) || norm(x.descricao).includes(norm(busca.trim()));
 const campoBusca = () => `<input id="busca" type="search" placeholder="${tab === 'realizado' ? 'Pesquisar categoria ou descrição...' : 'Pesquisar categoria...'}" value="${esc(busca)}" oninput="buscar(this.value)" style="min-width:220px" aria-label="Pesquisar categoria">`;
@@ -370,7 +372,7 @@ async function vPainel() {
   const cab = n => `<tr><th>${n}</th><th>Previsto (ano)</th><th>Realizado no período</th><th>Realizado no ano</th><th>Saldo do ano</th><th>Execução</th></tr>`;
 
   for (const t of ['receita', 'despesa']) {
-    const lista = cats.filter(c => c.tipo === t && c.ativo && casaCat(c));
+    const lista = cats.filter(c => c.tipo === t && c.ativo && !ehTransf(c) && casaCat(c));
     if (!lista.length) continue;
     let rows = '', tp = 0, tr = 0, tm = 0, cabNome = 'Categoria / Item';
 
@@ -680,7 +682,7 @@ async function vPrevisto() {
   $('#view').className = 'simples';
   $('#view').innerHTML = `<div class="row">${campoFiltro()}</div>
     <table><tr><th>Categoria</th><th>Previsto de ${ano()}</th></tr>
-    ${cats.filter(c => c.ativo).map(c => `<tr data-busca="${esc(norm(c.nome))}"><td>${esc(c.nome)} <small style="color:var(--mut)">(${c.tipo})</small></td>
+    ${cats.filter(c => c.ativo && !ehTransf(c)).map(c => `<tr data-busca="${esc(norm(c.nome))}"><td>${esc(c.nome)} <small style="color:var(--mut)">(${c.tipo})</small></td>
       <td><input type="number" step="0.01" data-c="${c.id}" value="${P[c.id] ?? ''}"></td></tr>`).join('')}</table>
     <p><button class="p" onclick="salvarPrev()">Salvar previsto</button></p>`;
 }
@@ -705,7 +707,7 @@ function vCategorias() {
       <button class="p" id="cbtn" onclick="addCat()">Adicionar</button>
       <button class="l" id="ccancel" style="color:var(--mut)" onclick="vCategorias()" hidden>Cancelar</button>
     </div>
-    <datalist id="l-nat"><option>Fixa</option><option>Variável</option><option>Investimento</option><option>Venda</option><option>Compra</option><option>Banco</option><option>Emprestimo</option><option>Arrendamento</option><option>Soja</option><option>Parceria</option></datalist>
+    <datalist id="l-nat"><option>Transferência</option><option>Fixa</option><option>Variável</option><option>Investimento</option><option>Venda</option><option>Compra</option><option>Banco</option><option>Emprestimo</option><option>Arrendamento</option><option>Soja</option><option>Parceria</option></datalist>
     <datalist id="l-sub"><option>Variáveis Operacional</option><option>Fixos</option><option>Receita</option><option>Variáveis Formação / Manut Pastos</option><option>Variáveis Nutrição Animal</option><option>Banco</option><option>Emprestimos</option><option>Variáveis Sanidade Animal</option><option>Soja</option><option>Investimentos</option></datalist>
     <div class="row">${campoFiltro()}</div>
     <table><tr><th>Natureza</th><th style="text-align:left">Categoria</th><th style="text-align:left">Subgrupo</th><th>Tipo</th><th></th></tr>
@@ -955,6 +957,7 @@ async function vResultados() {
   const gr = id => {
     const c = C[id];
     if (!c) return 'des';
+    if (ehTransf(c)) return 'transf';
     if (c.tipo === 'receita') return 'rec';
     return norm(c.natureza).startsWith('invest') || norm(c.subgrupo).startsWith('invest') ? 'inv' : 'des';
   };
@@ -967,8 +970,9 @@ async function vResultados() {
 
   rows.forEach(x => {
     const g = gr(x.categoria_id), v = +x.valor;
-    saldoConta[x.conta_id] = (saldoConta[x.conta_id] || 0) + (g === 'rec' ? v : -v);
-    if (x.data < de) return;
+    const entra = (C[x.categoria_id] || {}).tipo === 'receita';
+    saldoConta[x.conta_id] = (saldoConta[x.conta_id] || 0) + (entra ? v : -v);
+    if (g === 'transf' || x.data < de) return;
     tot[g] += v;
     (mes[x.data.slice(0, 7)] ||= { rec: 0, des: 0, inv: 0 })[g] += v;
     const c = C[x.categoria_id];
@@ -979,8 +983,8 @@ async function vResultados() {
 
   // previsto x realizado do ano rural
   const pa = { rec: 0, des: 0, inv: 0 }, ra = { rec: 0, des: 0, inv: 0 };
-  p.data.forEach(x => pa[gr(x.categoria_id)] += +x.valor);
-  rm.data.forEach(x => ra[gr(x.categoria_id)] += +x.total);
+  p.data.forEach(x => { const g = gr(x.categoria_id); if (g !== 'transf') pa[g] += +x.valor; });
+  rm.data.forEach(x => { const g = gr(x.categoria_id); if (g !== 'transf') ra[g] += +x.total; });
 
   // meses do período
   const meses = [];
