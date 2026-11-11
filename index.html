@@ -128,6 +128,43 @@ body:has(#app:not([hidden])){background:#06110b}
 #app dialog .dh h3{margin:0;padding:0;font-size:18px}
 #app dialog .dh button{background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);padding:6px 12px;cursor:pointer;font:inherit}
 #app dialog .dc{overflow:auto;max-height:calc(84vh - 66px)}
+/* ===== Permissões: esconde o que o usuário não pode usar (a proteção real é o RLS) ===== */
+body.sem-editar [onclick^="abrirLanc("],
+body.sem-editar [onclick^="delReal("]{display:none!important}
+body.sem-admin [onclick^="abrirContas("],
+body.sem-admin [onclick^="salvarPrev("],
+body.sem-admin [onclick^="addCat("],
+body.sem-admin [onclick^="editCat("],
+body.sem-admin [onclick^="toggleCat("],
+body.sem-admin #view .row:has(#cn){display:none!important}
+body.sem-admin [data-c]{pointer-events:none;opacity:.7}
+
+/* ===== Painel em lista expansível ===== */
+#app details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px}
+#app details>summary::-webkit-details-marker{display:none}
+#app details>summary::before{content:"›";flex:none;width:12px;color:var(--mut);font-size:18px;line-height:1;transition:transform .15s}
+#app details[open]>summary::before{transform:rotate(90deg)}
+#app .ps>summary{padding:11px 18px;background:#0f2a1c;color:var(--pri);font-weight:600;font-size:13px}
+#app .ps>summary .pv{margin-left:auto;color:var(--mut);font-weight:400;font-size:12px;text-align:right}
+#app .pi>summary{padding:12px 18px 12px 28px;border-bottom:1px solid #15301f}
+#app .pi>summary:hover{background:#12331f}
+#app .pi.tot>summary{padding-left:18px;font-weight:700;background:linear-gradient(90deg,#14513166,#0d2d1e)}
+#app .pn{flex:1;min-width:0}
+#app .pi .bar{flex:none;margin-right:0}
+#app .pp{width:42px;text-align:right;font-variant-numeric:tabular-nums}
+#app .pd{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;padding:12px 18px 16px 28px;background:#0a1a12;border-bottom:1px solid #15301f}
+#app .pd div{display:flex;flex-direction:column}
+#app .pd small{color:var(--mut)}
+#app .pd button{grid-column:1/-1;justify-self:start}
+#app .alerta>summary{font-size:16px;font-weight:700;color:var(--c)}
+#app .alerta ul{margin:8px 0 0}
+@media(max-width:900px){
+#app .ps>summary{padding:10px 14px}
+#app .pi>summary{padding:12px 14px 12px 22px}
+#app .pi.tot>summary{padding-left:14px}
+#app .pd{padding:12px 14px 14px 22px}
+}
+
 @media(max-width:900px){
 html{-webkit-text-size-adjust:100%}
 #app{grid-template-columns:minmax(0,1fr)}
@@ -184,6 +221,18 @@ html{-webkit-text-size-adjust:100%}
 #app dialog{max-height:88dvh}
 #app dialog .dc{max-height:calc(88dvh - 66px)}
 }
+/* ===== Usuários ===== */
+#app input[type=checkbox]{width:18px;height:18px;min-height:0;padding:0;accent-color:var(--pri)}
+#app .usr{margin-bottom:14px;padding:16px 18px;display:grid;gap:12px}
+#app .usr h3{padding:0}
+#app .usr-t{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+#app .usr .tag{padding:2px 8px;border-radius:999px;background:#3a1b17;color:var(--bad);font-size:12px}
+#app .usr-c{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+#app .usr-c input{width:100%}
+#app .usr-ck{display:flex;flex-wrap:wrap;gap:8px 18px}
+#app .usr-ck label{display:flex;align-items:center;gap:6px;cursor:pointer}
+#app .usr-b{display:flex;gap:10px;flex-wrap:wrap}
+@media(max-width:430px){#app nav button{font-size:9px}}
 </style>
 </head>
 <body>
@@ -209,6 +258,7 @@ html{-webkit-text-size-adjust:100%}
       <button data-t="categorias"><svg class="ic" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Plano de contas</span></button>
       <button data-t="relatorios"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h8"/></svg><span>Relatórios</span></button>
       <button data-t="resultados"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Resultados</span></button>
+      <button data-t="usuarios" hidden><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.2c2.2.5 3.5 2.2 3.5 4.8"/></svg><span>Usuários</span></button>
     </nav>
     <div class="rodape">
       <svg class="ic" viewBox="0 0 1324 1188"> <path d="M 461,1005 460,1051 467,1077 478,1098 493,1116 511,1130 537,1141 554,1144 752,1145 783,1140 813,1125 837,1103 855,1074 863,1044 862,1009 851,970 832,935 816,924 802,926 783,944 717,956 664,960 610,957 538,944 521,927 506,924 492,933 480,951 468,979 Z M 810,957 812,959 813,963 813,972 812,973 812,978 806,993 796,1006 767,1032 759,1045 758,1056 760,1063 765,1072 772,1080 771,1082 768,1082 755,1075 743,1062 739,1053 739,1047 738,1046 740,1034 742,1029 749,1019 762,1006 784,990 798,977 803,970 808,958 Z M 512,957 514,958 518,968 526,979 537,989 558,1004 575,1021 582,1033 584,1040 584,1050 580,1061 571,1072 557,1081 552,1082 551,1079 558,1071 562,1064 564,1058 563,1044 557,1034 548,1025 541,1020 522,1001 517,994 513,986 509,971 510,959 Z M 9,213 0,250 17,304 112,409 227,432 356,384 380,396 343,411 315,449 362,423 374,477 412,476 428,439 447,466 410,501 364,492 392,665 450,861 445,948 533,859 584,680 579,599 522,403 449,266 503,163 434,189 504,107 535,91 513,128 572,107 554,135 617,105 619,171 672,106 671,145 720,120 776,118 824,138 873,187 805,163 859,273 796,395 732,663 787,863 876,948 872,861 958,493 911,501 877,462 893,439 907,474 941,480 962,459 960,423 1007,449 984,415 942,396 965,384 1089,431 1195,417 1275,351 1323,247 1296,197 1192,164 1109,176 1014,240 982,240 848,108 880,118 818,54 745,27 674,32 592,0 535,10 475,50 419,116 458,103 336,240 161,166 68,178 Z" fill="#2FD46F" fill-rule="evenodd" clip-rule="evenodd"/>
@@ -357,9 +407,30 @@ function filtrarLinhas(v) {
   });
 }
 
+let perm = { admin: false, editar: false, abas: [] }, meuId = null;
+const pode = a => perm.admin || (a !== 'usuarios' && perm.abas.includes(a));
+const podeEditar = () => perm.admin || perm.editar;
+function aplicarPermissoes() {
+  const btns = [...document.querySelectorAll('#tabs button')];
+  btns.forEach(b => b.hidden = !pode(b.dataset.t));
+  const primeira = btns.find(b => !b.hidden);
+  if (!primeira) { alert('Seu usuário não tem nenhuma aba liberada.'); return false; }
+  tab = primeira.dataset.t;
+  btns.forEach(x => x.classList.toggle('on', x === primeira));
+  document.body.classList.toggle('sem-editar', !podeEditar());
+  document.body.classList.toggle('sem-admin', !perm.admin);
+  $('#bk').hidden = !perm.admin;
+  return true;
+}
 async function init() {
   const { data: { session } } = await db.auth.getSession();
   if (!session) { document.body.classList.add('entrando'); $('#login').hidden = false; return; }
+  const { data: pm, error } = await db.from('permissoes').select('*').eq('user_id', session.user.id).maybeSingle();
+  if (error) return alert('Erro ao carregar permissões: ' + error.message);
+  if (!pm) { alert('Seu usuário ainda não tem acesso. Peça ao administrador para liberar.'); await db.auth.signOut(); return location.reload(); }
+  perm = { admin: !!pm.admin, editar: !!pm.editar, abas: pm.abas || [] };
+  meuId = session.user.id;
+  if (!aplicarPermissoes()) { await db.auth.signOut(); return location.reload(); }
   $('#app').hidden = false;
   preset('mes');
   render();
@@ -394,11 +465,86 @@ async function render() {
   if (rc.error) return alert(rc.error.message);
   if (rb.error) return alert(rb.error.message);
   cats = rc.data; contas = rb.data;
-  ({ painel: vPainel, realizado: vRealizado, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados })[tab]();
+  ({ painel: vPainel, realizado: vRealizado, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados, usuarios: vUsuarios })[tab]();
 }
 
-/* ---------- Painel ---------- */
+function itemPainel(nome, a, b, t, m, ids, tot) {
+  // a = previsto do ano | b = realizado no ano | m = realizado no período
+  const s = t === 'despesa' ? a - b : b - a;
+  const pc = a > 0 ? b / a * 100 : 0;
+  const over = t === 'despesa' && b > a;
+  return `<details class="pi${tot ? ' tot' : ''}"><summary><span class="pn">${nome}</span>
+      <span class="bar"><i class="${over ? 'over' : ''}" style="width:${Math.min(pc, 100)}%"></i></span><span class="pp${over ? ' neg' : ''}">${pc.toFixed(0)}%</span></summary>
+    <div class="pd">
+      <div><small>Previsto (ano)</small><b>${brl(a)}</b></div>
+      <div><small>Realizado no período</small><b>${brl(m)}</b></div>
+      <div><small>Realizado no ano</small><b>${brl(b)}</b></div>
+      <div><small>Saldo do ano</small><b class="${s < 0 ? 'neg' : ''}">${brl(s)}</b></div>
+      <button class="p" data-ids="${ids.join(',')}" data-nome="${nome}">Ver lançamentos</button>
+    </div></details>`;
+}
+
 async function vPainel() {
+  $('#view').className = '';
+  const [p, r, rp] = await Promise.all([
+    db.from('previsto').select('categoria_id,valor').gte('mes', iniAno()).lt('mes', fimAno()),
+    db.from('realizado_mensal').select('categoria_id,mes,total').gte('mes', iniAno()).lt('mes', fimAno()),
+    todos(() => db.from('realizado').select('categoria_id,valor').gte('data', ini()).lt('data', fim()).order('id'))
+  ]);
+  if (p.error) return alert(p.error.message);
+  if (r.error) return alert(r.error.message);
+  const P = {}, R = {}, M = {};
+  p.data.forEach(x => P[x.categoria_id] = (P[x.categoria_id] || 0) + +x.valor);
+  r.data.forEach(x => R[x.categoria_id] = (R[x.categoria_id] || 0) + +x.total);
+  rp.forEach(x => M[x.categoria_id] = (M[x.categoria_id] || 0) + +x.valor);
+  const sel = v => agr === v ? ' selected' : '';
+  let h = alertas(P, R) + `<div class="row"><select onchange="agr=this.value;vPainel()" aria-label="Agrupamento">
+    <option value="secao"${sel('secao')}>Por seção (modelo planilha)</option>
+    <option value="nome"${sel('nome')}>Agrupar por categoria</option>
+    <option value="natureza"${sel('natureza')}>Agrupar por natureza</option>
+    <option value="subgrupo"${sel('subgrupo')}>Agrupar por subgrupo</option></select>
+    ${campoBusca()}
+    <span class="periodo">Ano rural ${ano()} (set a ago) • Período: ${br(ini())} a ${br($('#ate').value)}</span></div>`;
+
+  for (const t of ['receita', 'despesa']) {
+    const lista = cats.filter(c => c.tipo === t && c.ativo && !ehTransf(c) && casaCat(c));
+    if (!lista.length) continue;
+    let rows = '', tp = 0, tr = 0, tm = 0;
+
+    if (agr === 'secao') {
+      const S = {};
+      lista.forEach(c => { (S[c.subgrupo || '(sem seção)'] ||= []).push(c); });
+      Object.entries(S).sort((a, b) => posSecao(a[0]) - posSecao(b[0])).forEach(([sec, cs]) => {
+        let sp = 0, sr = 0, sm = 0, itens = '';
+        cs.forEach(c => {
+          const a = P[c.id] || 0, b = R[c.id] || 0, m = M[c.id] || 0;
+          sp += a; sr += b; sm += m;
+          itens += itemPainel(esc(c.nome), a, b, t, m, [c.id]);
+        });
+        tp += sp; tr += sr; tm += sm;
+        rows += `<details class="ps" open><summary><span class="pn">${esc(sec)}</span><span class="pv">${brl(sr)} de ${brl(sp)}</span></summary>${itens}</details>`;
+      });
+    } else {
+      const G = {};
+      lista.forEach(c => {
+        const k = c[agr] || '(não informado)';
+        G[k] = G[k] || [0, 0, 0, []];
+        G[k][0] += P[c.id] || 0; G[k][1] += R[c.id] || 0; G[k][2] += M[c.id] || 0;
+        G[k][3].push(c.id);
+      });
+      Object.entries(G).forEach(([k, [a, b, m, ids]]) => { tp += a; tr += b; tm += m; rows += itemPainel(esc(k), a, b, t, m, ids); });
+    }
+    rows = itemPainel(agr === 'secao' ? 'TOTAL GERAL' : 'Total', tp, tr, t, tm, lista.map(c => c.id), true) + rows;
+    h += bloco(t, `<div class="pl">${rows}</div>`, tp, tr);
+  }
+  $('#view').innerHTML = !cats.some(c => c.ativo)
+    ? '<p class="empty">Cadastre as contas na aba Plano de contas para começar.</p>'
+    : h.includes('class="bloco"') ? h : h + '<p class="empty">Nenhuma categoria encontrada.</p>';
+}
+
+
+/* ---------- Painel ---------- */
+async function vPainelAntigo() {
   $('#view').className = '';
   const [p, r, rp] = await Promise.all([
     db.from('previsto').select('categoria_id,valor').gte('mes', iniAno()).lt('mes', fimAno()),
@@ -498,8 +644,8 @@ function alertas(P, R) {
     const item = `<li><b>${esc(c.nome)}</b>: ${pc.toFixed(0)}% do previsto (${brl(R[c.id] || 0)} de ${brl(P[c.id])})</li>`;
     if (pc >= 100) est.push(item); else if (pc >= LIMITE_ALERTA) per.push(item);
   });
-  return (est.length ? `<div class="alerta" role="alert"><h4>⚠ Previsto estourado em ${est.length} conta(s)</h4><ul>${est.join('')}</ul></div>` : '')
-    + (per.length ? `<div class="alerta aviso" role="alert"><h4>Atenção: perto do previsto (${LIMITE_ALERTA}% ou mais)</h4><ul>${per.join('')}</ul></div>` : '');
+  return (est.length ? `<details class="alerta" role="alert"><summary>⚠ Previsto estourado em ${est.length} conta(s)</summary><ul>${est.join('')}</ul></details>` : '')
+    + (per.length ? `<details class="alerta aviso" role="alert"><summary>Atenção: perto do previsto (${LIMITE_ALERTA}% ou mais): ${per.length} conta(s)</summary><ul>${per.join('')}</ul></details>` : '');
 }
 
 async function checarAlerta(catId, data) {
@@ -1116,9 +1262,9 @@ async function vResultados() {
 
 /* ---------- Detalhe ao clicar no Painel ---------- */
 $('#view').addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-ids]');
-  if (!tr) return;
-  detalhe(tr.dataset.ids.split(',').map(Number), tr.dataset.nome);
+  const el = e.target.closest('[data-ids]');
+  if (!el) return;
+  detalhe(el.dataset.ids.split(',').map(Number), el.dataset.nome);
 });
 $('#det-x').onclick = () => $('#det').close();
 $('#det').addEventListener('click', e => { if (e.target.id === 'det') $('#det').close(); });
@@ -1162,6 +1308,87 @@ async function detalhe(ids, titulo) {
        <tr class="tot"><td colspan="3">Total (${data.length} lançamento${data.length > 1 ? 's' : ''})</td><td>${brl(total)}</td></tr></table>`
     : '<p class="empty">Nenhum lançamento neste período.</p>';
   $('#det').showModal();
+}
+
+/* ---------- Usuários (somente administrador) ---------- */
+const ABAS = [['painel', 'Painel'], ['realizado', 'Conta corrente'], ['previsto', 'Previsto'],
+              ['categorias', 'Plano de contas'], ['relatorios', 'Relatórios'], ['resultados', 'Resultados']];
+let usuarios = [];
+
+const checksUsuario = u => `<div class="usr-ck">`
+  + ABAS.map(([k, n]) => `<label><input type="checkbox" data-aba="${k}"${(u.abas || []).includes(k) ? ' checked' : ''}> ${n}</label>`).join('')
+  + `<label><input type="checkbox" data-f="editar"${u.editar ? ' checked' : ''}> Pode lançar</label>`
+  + `<label><input type="checkbox" data-f="admin"${u.admin ? ' checked' : ''}> Administrador</label></div>`;
+
+const lerCartao = el => ({
+  abas: [...el.querySelectorAll('[data-aba]:checked')].map(i => i.dataset.aba),
+  editar: el.querySelector('[data-f=editar]').checked,
+  admin: el.querySelector('[data-f=admin]').checked
+});
+
+const cartaoUsuario = u => `<div class="card usr" data-u="${u.user_id}">
+  <div class="usr-t"><b>${esc(u.email)}</b>${u.tem_perfil ? '' : '<span class="tag">sem acesso</span>'}</div>
+  <div class="usr-c"><input class="un" placeholder="Nome" value="${esc(u.nome || '')}"></div>
+  ${checksUsuario(u)}
+  <div class="usr-b"><button class="p" onclick="salvarUsuario('${u.user_id}')">Salvar</button>
+    ${u.tem_perfil ? `<button class="l" onclick="removerAcesso('${u.user_id}')">Remover acesso</button>` : ''}</div>
+</div>`;
+
+async function vUsuarios() {
+  $('#view').className = 'simples';
+  const { data, error } = await db.rpc('listar_usuarios');
+  if (error) return alert(error.message);
+  usuarios = data || [];
+  $('#view').innerHTML = `
+    <div class="card usr novo">
+      <h3>Novo usuário</h3>
+      <div class="usr-c">
+        <input id="un" placeholder="Nome">
+        <input id="ue" type="email" placeholder="E-mail" autocomplete="off">
+        <input id="us" placeholder="Senha (mínimo 6 caracteres)" autocomplete="off">
+      </div>
+      ${checksUsuario({ abas: ['painel'], editar: false, admin: false })}
+      <div class="usr-b"><button class="p" onclick="criarUsuario()">Criar usuário</button></div>
+    </div>
+    ${usuarios.map(cartaoUsuario).join('')}`;
+}
+
+async function criarUsuario() {
+  const email = $('#ue').value.trim(), senha = $('#us').value, nome = $('#un').value.trim();
+  if (!email || senha.length < 6) return alert('Informe o e-mail e uma senha com pelo menos 6 caracteres.');
+  const v = lerCartao(document.querySelector('.usr.novo'));
+  if (!v.admin && !v.abas.length) return alert('Marque pelo menos uma aba.');
+  // cliente separado, para não trocar a sua sessão de administrador
+  const aux = supabase.createClient(SUPABASE_URL, SUPABASE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'prumo-cadastro' } });
+  const { data, error } = await aux.auth.signUp({ email, password: senha });
+  if (error) return alert('Não foi possível criar o login: ' + error.message);
+  if (!data.user || !(data.user.identities || []).length) return alert('Este e-mail já está cadastrado.');
+  const { error: e2 } = await db.from('permissoes')
+    .upsert({ user_id: data.user.id, nome: nome || email, ...v }, { onConflict: 'user_id' });
+  if (e2) return alert('Login criado, mas as permissões falharam: ' + e2.message);
+  alert('Usuário criado. Passe o e-mail e a senha para a pessoa.');
+  vUsuarios();
+}
+
+async function salvarUsuario(id) {
+  const el = document.querySelector(`.usr[data-u="${id}"]`);
+  const u = usuarios.find(x => x.user_id === id);
+  const v = lerCartao(el);
+  if (id === meuId && !v.admin) return alert('Você não pode tirar o seu próprio acesso de administrador.');
+  if (!v.admin && !v.abas.length) return alert('Marque pelo menos uma aba.');
+  const { error } = await db.from('permissoes')
+    .upsert({ user_id: id, nome: el.querySelector('.un').value.trim() || u.email, ...v }, { onConflict: 'user_id' });
+  if (error) return alert(error.message);
+  alert('Salvo.');
+  vUsuarios();
+}
+
+async function removerAcesso(id) {
+  if (id === meuId) return alert('Você não pode remover o seu próprio acesso.');
+  if (!confirm('Remover o acesso deste usuário? O login continua existindo, mas ele não verá nenhum dado.')) return;
+  const { error } = await db.from('permissoes').delete().eq('user_id', id);
+  error ? alert(error.message) : vUsuarios();
 }
 
 /* ---------- Backup ---------- */
