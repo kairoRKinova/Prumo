@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Prumo">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Prumo Gestão Financeira</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Bitter:wght@600&display=swap">
 <style>
@@ -128,17 +129,60 @@ body:has(#app:not([hidden])){background:#06110b}
 #app dialog .dh button{background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);padding:6px 12px;cursor:pointer;font:inherit}
 #app dialog .dc{overflow:auto;max-height:calc(84vh - 66px)}
 @media(max-width:900px){
-#app{grid-template-columns:1fr}
-#app aside{flex-direction:row;align-items:center;padding:10px 14px;border-right:0;border-bottom:1px solid var(--bd)}
-#app .logo small,#app .rodape{display:none}
-#app .logo{flex-direction:row;gap:8px}
-#app .logo .ic{margin:0;width:26px;height:26px}
-#app .logo b{font-size:17px}
-#app nav{flex-direction:row;margin:0;overflow-x:auto}
-#app nav button span{display:none}
-#app header,#app main{padding-left:16px;padding-right:16px}
-#app .bloco{grid-template-columns:1fr}
-#app .meta{flex-direction:row;justify-content:space-around}
+html{-webkit-text-size-adjust:100%}
+#app{grid-template-columns:minmax(0,1fr)}
+
+/* abas: barra fixa embaixo, como um app */
+#app aside{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:50;height:auto;align-self:auto;flex-direction:row;align-items:stretch;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border-right:0;border-bottom:0;border-top:1px solid var(--bd);overflow:visible}
+#app .logo,#app .rodape{display:none}
+#app nav{flex:1;min-width:0;flex-direction:row;gap:2px;margin:0;overflow:visible}
+#app nav button{flex:1 1 0;min-width:0;flex-direction:column;justify-content:flex-start;gap:3px;padding:7px 2px 5px;font-size:10px;line-height:1.15;text-align:center}
+#app nav button span{display:block}
+#app nav button .ic{width:20px;height:20px}
+
+/* topo */
+#app header{padding:14px 16px 4px}
+#app header h1{font-size:21px}
+#app header p{font-size:13px}
+#app .titulo>.ic{width:28px;height:28px}
+#app .filtro{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+#app .filtro select{grid-column:1/-1}
+#app .filtro label{min-width:0}
+#app .filtro label input{width:100%;min-width:0}
+#app .filtro button{justify-content:center}
+#app main{padding:10px 16px calc(96px + env(safe-area-inset-bottom))}
+
+/* campos: 16px evita o zoom automático do iPhone */
+#app input,#app select{font-size:16px;min-height:44px}
+#app input[type=date]{-webkit-appearance:none;appearance:none;text-align:left}
+#app input[type=date]::-webkit-date-and-time-value{text-align:left}
+#app .row input,#app .row select{flex:1 1 100%;min-width:0}
+#app .row button{flex:1 1 auto}
+#app td input{width:130px;min-width:0}
+
+/* painel e tabelas */
+#app .bloco{grid-template-columns:minmax(0,1fr);gap:12px}
+#app .meta{flex-direction:row;justify-content:space-around;padding:14px}
+#app .meta svg{width:110px;height:110px}
+#app .card h3{font-size:16px;padding:14px 14px 8px}
+#app th,#app td{padding:9px 10px;font-size:13px}
+#app tr.it td:first-child{padding-left:16px}
+#app .scroll{-webkit-overflow-scrolling:touch}
+#app .scroll th:first-child,#app .scroll td:first-child{position:sticky;left:0;z-index:1;background:#0d1f16;white-space:normal;min-width:110px}
+#app .scroll tr.tot td:first-child{background:#123d27}
+#app .scroll tr.sub td:first-child{background:#16301f}
+#app .scroll tr.sec td:first-child{background:#0f2a1c}
+#app .scroll tr.spc td:first-child{background:transparent}
+#app .simples>table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* resultados */
+#app main div[style*="minmax(360px"]{grid-template-columns:minmax(0,1fr)!important}
+#app .card:has(>svg[aria-label^="Receitas, despesas"]){overflow-x:auto}
+#app .card>svg[aria-label^="Receitas, despesas"]{min-width:760px}
+
+/* janelas */
+#app dialog{max-height:88dvh}
+#app dialog .dc{max-height:calc(88dvh - 66px)}
 }
 </style>
 </head>
