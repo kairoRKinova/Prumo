@@ -17,7 +17,9 @@ const fimAno = () => (anoIni() + 1) + '-09-01';
 // Trimestre do ano rural que contém a data "De" (Set-Nov, Dez-Fev, Mar-Mai, Jun-Ago)
 const MESES_ABR = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 function trimestre() {
-  const m = +ini().split('-')[1];
+  const dias = (new Date(fim()) - new Date(ini())) / 864e5;
+  const ref = dias > 95 ? hoje() : ini();   // período longo (ex.: ano rural): usa o trimestre de hoje
+  const m = +ref.split('-')[1];
   const q = Math.floor(((m + 3) % 12) / 3);          // 0..3 (set = 0)
   const a = anoIni();
   const s = new Date(Date.UTC(a, 8 + q * 3, 1));
@@ -73,12 +75,12 @@ const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '
 const ehTransf = c => !!c && norm(c.natureza).startsWith('transfer');
 const casaCat = c => !busca.trim() || norm(c.nome).includes(norm(busca.trim()));
 const casaLanc = (x, nomeCat) => !busca.trim() || norm(nomeCat).includes(norm(busca.trim())) || norm(x.descricao).includes(norm(busca.trim()));
-const campoBusca = () => `<input id="busca" type="search" placeholder="${tab === 'realizado' ? 'Pesquisar categoria ou descrição...' : 'Pesquisar categoria...'}" value="${esc(busca)}" oninput="buscar(this.value)" style="min-width:220px" aria-label="Pesquisar categoria">`;
+const campoBusca = () => `<input id="busca" type="search" placeholder="${['realizado', 'pagar', 'receber'].includes(tab) ? 'Pesquisar categoria ou descrição...' : 'Pesquisar categoria...'}" value="${esc(busca)}" oninput="buscar(this.value)" style="min-width:220px" aria-label="Pesquisar categoria">`;
 function buscar(v) {
   busca = v;
   clearTimeout(tBusca);
   tBusca = setTimeout(async () => {
-    await (tab === 'painel' ? vPainel() : vRealizado());
+    await ({ painel: vPainel, realizado: vRealizado, pagar: vPagar, receber: vReceber }[tab])();
     const i = $('#busca');
     if (i) { i.focus(); i.setSelectionRange(v.length, v.length); }
   }, 250);
@@ -118,7 +120,8 @@ async function init() {
   meuId = session.user.id;
   if (!aplicarPermissoes()) { await db.auth.signOut(); return location.reload(); }
   $('#app').hidden = false;
-  preset('mes');
+  $('#pre').value = 'ano';   // mostra "Ano rural atual" no seletor
+  preset('ano');             // 01/09 a 31/08 do ano rural em andamento
   render();
 }
 $('#entrar').onclick = async () => {
@@ -151,7 +154,7 @@ async function render() {
   if (rc.error) return alert(rc.error.message);
   if (rb.error) return alert(rb.error.message);
   cats = rc.data; contas = rb.data;
-  ({ painel: vPainel, realizado: vRealizado, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados, usuarios: vUsuarios })[tab]();
+  ({ painel: vPainel, realizado: vRealizado, pagar: vPagar, receber: vReceber, cotacao: vCotacao, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados, usuarios: vUsuarios })[tab]();
 }
 
 function itemPainel(nome, a, b, t, m, ids, tot) {
@@ -179,10 +182,17 @@ function itemPainel(nome, a, b, t, m, ids, tot) {
 
 async function vPainel() {
   $('#view').className = '';
-  const [p, r, rp] = await Promise.all([
+  const [p, r, rp, cp] = await Promise.all([
     db.from('previsto').select('categoria_id,valor').gte('mes', iniAno()).lt('mes', fimAno()),
     db.from('realizado_mensal').select('categoria_id,mes,total').gte('mes', iniAno()).lt('mes', fimAno()),
-    todos(() => db.from('realizado').select('categoria_id,valor').gte('data', ini()).lt('data', fim()).order('id'))
+    todos(() => db.from('realizado').select('categoria_id,valor').gte('data', ini()).lt('data', fim()).order('id')),
+    // contas a pagar ainda NÃO baixadas (as baixadas já estão em "realizado")
+    Promise.all([
+      todos(() => db.from('contas_pagar').select('categoria_id,valor,vencimento').eq('pago', false)
+        .gte('vencimento', iniAno()).lt('vencimento', fimAno()).order('id')),
+      todos(() => db.from('contas_receber').select('categoria_id,valor,vencimento').eq('recebido', false)
+        .gte('vencimento', iniAno()).lt('vencimento', fimAno()).order('id'))
+    ]).then(([a, b]) => [...a, ...b])
   ]);
   if (p.error) return alert(p.error.message);
   if (r.error) return alert(r.error.message);
@@ -190,12 +200,19 @@ async function vPainel() {
   p.data.forEach(x => P[x.categoria_id] = (P[x.categoria_id] || 0) + +x.valor);
   r.data.forEach(x => R[x.categoria_id] = (R[x.categoria_id] || 0) + +x.total);
   rp.forEach(x => M[x.categoria_id] = (M[x.categoria_id] || 0) + +x.valor);
+  // contas a pagar em aberto entram no painel pelo vencimento
+  cp.forEach(x => {
+    R[x.categoria_id] = (R[x.categoria_id] || 0) + +x.valor;
+    if (x.vencimento >= ini() && x.vencimento < fim()) M[x.categoria_id] = (M[x.categoria_id] || 0) + +x.valor;
+  });
   // trimestre: previsto = anual / 4 | realizado = soma dos meses do trimestre
   const tri = trimestre();
   TRI = { P: {}, R: {}, nome: tri.nome };
   Object.keys(P).forEach(k => TRI.P[k] = P[k] / 4);
   r.data.filter(x => x.mes >= tri.ini && x.mes < tri.fim)
     .forEach(x => TRI.R[x.categoria_id] = (TRI.R[x.categoria_id] || 0) + +x.total);
+  cp.filter(x => x.vencimento >= tri.ini && x.vencimento < tri.fim)
+    .forEach(x => TRI.R[x.categoria_id] = (TRI.R[x.categoria_id] || 0) + +x.valor);
   const sel = v => agr === v ? ' selected' : '';
   let h = alertas(P, R) + `<div class="row"><select onchange="agr=this.value;vPainel()" aria-label="Agrupamento">
     <option value="secao"${sel('secao')}>Por seção (modelo planilha)</option>
@@ -997,20 +1014,32 @@ async function detalhe(ids, titulo) {
       .in('categoria_id', ids).gte('data', ini()).lt('data', fim())
       .order('data', { ascending: false }).order('id'));
   } catch (err) { return alert(err.message); }
+  let pend = [];
+  try {
+    const [pp, pr] = await Promise.all([
+      todos(() => db.from('contas_pagar').select('*').in('categoria_id', ids).eq('pago', false)
+        .gte('vencimento', ini()).lt('vencimento', fim()).order('vencimento').order('id')),
+      todos(() => db.from('contas_receber').select('*').in('categoria_id', ids).eq('recebido', false)
+        .gte('vencimento', ini()).lt('vencimento', fim()).order('vencimento').order('id'))
+    ]);
+    pend = [...pp, ...pr].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+  } catch (err) { return alert(err.message); }
   const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
-  const total = data.reduce((s, x) => s + +x.valor, 0);
+  const total = data.reduce((s, x) => s + +x.valor, 0) + pend.reduce((s, x) => s + +x.valor, 0);
   $('#det-t').textContent = `${titulo} • ${br(ini())} a ${br($('#ate').value)}`;
-  $('#det-c').innerHTML = data.length
+  $('#det-c').innerHTML = (data.length || pend.length)
     ? `<table><tr><th>Data</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrição</th><th>Valor</th></tr>
        ${data.map(x => `<tr><td>${br(x.data)}</td><td style="text-align:left">${esc(N[x.categoria_id])}</td>
          <td style="text-align:left">${esc(x.descricao)}</td><td>${brl(x.valor)}</td></tr>`).join('')}
-       <tr class="tot"><td colspan="3">Total (${data.length} lançamento${data.length > 1 ? 's' : ''})</td><td>${brl(total)}</td></tr></table>`
+       ${pend.map(x => `<tr><td>${br(x.vencimento)}</td><td style="text-align:left">${esc(N[x.categoria_id])}</td>
+         <td style="text-align:left">${esc(x.descricao)} <small style="color:var(--acc)">(${x.recebido !== undefined ? 'a receber' : 'a pagar'})</small></td><td>${brl(x.valor)}</td></tr>`).join('')}
+       <tr class="tot"><td colspan="3">Total (${data.length + pend.length} lançamento${data.length + pend.length > 1 ? 's' : ''})</td><td>${brl(total)}</td></tr></table>`
     : '<p class="empty">Nenhum lançamento neste período.</p>';
   $('#det').showModal();
 }
 
 /* ---------- Usuários (somente administrador) ---------- */
-const ABAS = [['painel', 'Painel'], ['realizado', 'Conta corrente'], ['previsto', 'Previsto'],
+const ABAS = [['painel', 'Painel'], ['realizado', 'Conta corrente'], ['pagar', 'Contas a pagar'], ['receber', 'Contas a receber'], ['cotacao', 'Cotação'], ['previsto', 'Previsto'],
               ['categorias', 'Plano de contas'], ['relatorios', 'Relatórios'], ['resultados', 'Resultados']];
 let usuarios = [];
 
@@ -1089,6 +1118,696 @@ async function removerAcesso(id) {
   const { error } = await db.from('permissoes').delete().eq('user_id', id);
   error ? alert(error.message) : vUsuarios();
 }
+
+/* ---------- Contas a pagar ---------- */
+let pagarFiltro = 'abertas', pagarLista = [], editPgId = null, baixaId = null;
+let mapaCatPg = {};   // texto exibido -> id da categoria (só despesas)
+function catPgPorTexto(t) {
+  t = norm((t || '').trim());
+  if (!t) return null;
+  const k = Object.keys(mapaCatPg).find(k => norm(k) === t);
+  return k ? mapaCatPg[k] : null;
+}
+
+// soma n meses mantendo o dia (31 -> último dia do mês quando precisar)
+const addMes = (s, n) => {
+  const [y, m, d] = s.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + n, 1));
+  const ult = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(d, ult));
+  return t.toISOString().slice(0, 10);
+};
+
+async function vPagar() {
+  $('#view').className = 'simples';
+  let data;
+  try {
+    data = await todos(() => {
+      let s = db.from('contas_pagar').select('*');
+      s = pagarFiltro === 'vencidas'
+        ? s.eq('pago', false).lt('vencimento', hoje())            // vencidas: ignora o período
+        : s.gte('vencimento', ini()).lt('vencimento', fim());
+      return s.order('vencimento').order('id');
+    });
+  } catch (err) { return alert(err.message); }
+  pagarLista = data;
+
+  const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
+  const CB = Object.fromEntries(contas.map(c => [c.id, c.nome]));
+  const h = hoje();
+  const soma = a => a.reduce((s, x) => s + +x.valor, 0);
+  const cardPg = (t, v, cor) => `<div class="card" style="padding:14px 18px;min-width:190px"><small style="color:var(--mut)">${t}</small>
+    <div style="font-size:20px;font-weight:700;color:${cor || 'inherit'}">${brl(v)}</div></div>`;
+  const status = x => x.pago ? `<span style="color:var(--pri)">Pago em ${br(x.data_pagamento)}</span>`
+    : x.vencimento < h ? '<span class="neg">Vencida</span>' : '<span style="color:var(--acc)">Em aberto</span>';
+
+  const lista = data.filter(x =>
+    (pagarFiltro === 'abertas' ? !x.pago : pagarFiltro === 'pagas' ? x.pago : true) &&
+    casaLanc(x, N[x.categoria_id]));
+
+  const abertas = data.filter(x => !x.pago);
+  const sf = v => ' selected'.repeat(pagarFiltro === v);
+
+  $('#view').innerHTML = `
+    <div class="row"><button class="p" onclick="abrirPagar()">+ Nova conta a pagar</button>
+      <select onchange="pagarFiltro=this.value;vPagar()" aria-label="Situação">
+        <option value="abertas"${sf('abertas')}>Não pagas</option>
+        <option value="pagas"${sf('pagas')}>Pagas</option>
+        <option value="todas"${sf('todas')}>Todas</option>
+        <option value="vencidas"${sf('vencidas')}>Vencidas (qualquer data)</option>
+      </select>
+      ${campoBusca()}</div>
+    <div class="row">
+      ${cardPg('Em aberto no período', soma(abertas.filter(x => x.vencimento >= h)))}
+      ${cardPg('Vencidas', soma(abertas.filter(x => x.vencimento < h)), 'var(--bad)')}
+      ${cardPg('Pagas no período', soma(data.filter(x => x.pago)), 'var(--pri)')}
+    </div>
+    <div class="scroll"><table>
+      <tr><th>Lançamento</th><th>Vencimento</th><th style="text-align:left">Conta</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrição</th><th>Forma</th><th>Valor</th><th>Situação</th><th></th></tr>
+      ${lista.map(x => `<tr><td>${br(x.data_lancamento)}</td><td>${br(x.vencimento)}</td><td style="text-align:left">${esc(CB[x.conta_id] || '')}</td>
+        <td style="text-align:left">${esc(N[x.categoria_id])}</td><td style="text-align:left">${esc(x.descricao)}</td>
+        <td>${x.forma === 'vista' ? 'À vista' : `Parcela ${x.parcela}/${x.parcelas}`}</td>
+        <td>${brl(x.valor)}</td><td>${status(x)}</td>
+        <td>${x.pago
+          ? `<button class="l" onclick="estornarPagar(${x.id})">Estornar</button>`
+          : `<button class="l" style="color:var(--pri)" onclick="abrirBaixa(${x.id})">Baixar</button>
+             <button class="l" style="color:var(--pri)" onclick="abrirPagar(${x.id})">Editar</button>
+             <button class="l" onclick="delPagar(${x.id})">Excluir</button>`}</td></tr>`).join('')
+        || '<tr><td colspan="9" class="empty">Nenhuma conta encontrada.</td></tr>'}
+      <tr class="tot"><td colspan="6">Total listado (${lista.length})</td><td>${brl(soma(lista))}</td><td colspan="2"></td></tr>
+    </table></div>`;
+}
+
+function togglePgForma() {
+  $('#pgn-l').style.display = $('#pgf').value === 'parcelado' ? 'grid' : 'none';
+  gerarParcelas(true);
+}
+
+// monta uma linha por parcela (vencimento + valor), todas editáveis
+let sigParc = '';   // "assinatura" (parcelas|valor|1º vencimento) da lista atual
+function gerarParcelas(force) {
+  const box = $('#pg-parc'), soma = $('#pg-soma');
+  if (editPgId || $('#pgf').value !== 'parcelado') {
+    box.style.display = 'none'; box.innerHTML = ''; soma.style.display = 'none'; sigParc = '';
+    return;
+  }
+  const n = Math.min(60, Math.max(2, parseInt($('#pgn').value) || 2));
+  $('#pgn').value = n;
+  const v = parseFloat($('#pgv').value) || 0, dt = $('#pgdt').value || hoje();
+  const sig = [n, v, dt].join('|');
+  if (!force && sig === sigParc && box.children.length) return;   // nada mudou: preserva o que foi editado
+  sigParc = sig;
+  const cent = Math.round(v * 100), base = Math.floor(cent / n);
+  box.style.display = 'grid'; soma.style.display = 'block';
+  box.innerHTML = Array.from({ length: n }, (_, i) => `
+    <div style="display:grid;grid-template-columns:34px 1fr 1fr;gap:8px;align-items:center">
+      <small style="color:var(--mut)">${i + 1}/${n}</small>
+      <input type="date" data-pd value="${addMes(dt, i)}" aria-label="Vencimento da parcela ${i + 1}">
+      <input type="number" step="0.01" data-pv value="${((i === n - 1 ? cent - base * (n - 1) : base) / 100).toFixed(2)}"
+             oninput="somaParcelas()" aria-label="Valor da parcela ${i + 1}">
+    </div>`).join('');
+  somaParcelas();
+}
+
+function somaParcelas() {
+  const s = [...document.querySelectorAll('#pg-parc [data-pv]')].reduce((a, i) => a + (parseFloat(i.value) || 0), 0);
+  const tot = parseFloat($('#pgv').value) || 0;
+  const dif = Math.round((s - tot) * 100) / 100;
+  $('#pg-soma').innerHTML = `Soma das parcelas: <b>${brl(s)}</b>` +
+    (dif ? ` <span class="neg">(${dif > 0 ? '+' : ''}${brl(dif)} em relação ao valor total)</span>` : '');
+}
+
+function abrirPagar(id) {
+  const x = id ? pagarLista.find(l => l.id === id) : null;
+  editPgId = x ? x.id : null;
+  mapaCatPg = {};
+  cats.filter(c => c.ativo && c.tipo === 'despesa' && !ehTransf(c)).forEach(c => mapaCatPg[c.nome] = c.id);
+  if (x && !Object.values(mapaCatPg).includes(x.categoria_id)) {
+    const c = cats.find(c => c.id === x.categoria_id);
+    mapaCatPg[`${c ? c.nome : 'Categoria ' + x.categoria_id} (inativa)`] = x.categoria_id;
+  }
+  $('#pgc-list').innerHTML = Object.keys(mapaCatPg).map(k => `<option value="${esc(k)}">`).join('');
+  $('#pgl').value = x ? (x.data_lancamento || hoje()) : hoje();
+  $('#pgb').innerHTML = contas.filter(c => c.ativo || (x && x.conta_id === c.id))
+    .map(c => `<option value="${c.id}">${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
+  $('#pgb').value = (x && x.conta_id) ? x.conta_id : ((contas.find(c => c.ativo) || {}).id || '');
+  $('#pgd').value = x ? (x.descricao || '') : '';
+  $('#pgc').value = x ? (Object.keys(mapaCatPg).find(k => mapaCatPg[k] === x.categoria_id) || '') : '';
+  $('#pgv').value = x ? x.valor : '';
+  $('#pgdt').value = x ? x.vencimento : hoje();
+  $('#pgf').value = 'vista'; $('#pgn').value = 2;
+  $('#pg-forma').style.display = x ? 'none' : 'grid';   // edição: só ajusta aquela parcela
+  togglePgForma();
+  $('#pg-t').textContent = x ? 'Editar conta a pagar' : 'Nova conta a pagar';
+  $('#pgbtn').textContent = x ? 'Salvar alteração' : 'Lançar';
+  $('#pg').showModal();
+  (x ? $('#pgv') : $('#pgl')).focus();
+}
+
+async function salvarPagar() {
+  const cat = catPgPorTexto($('#pgc').value), v = parseFloat($('#pgv').value), dt = $('#pgdt').value;
+  const dl = $('#pgl').value, cb = +$('#pgb').value;
+  if (!cat || !dt || !dl || !cb || isNaN(v) || v <= 0) return alert('Informe data do lançamento, conta, categoria (escolha uma da lista), valor e vencimento.');
+  const desc = $('#pgd').value.trim();
+  if (editPgId) {
+    const { error } = await db.from('contas_pagar')
+      .update({ categoria_id: cat, conta_id: cb, data_lancamento: dl, descricao: desc, valor: v, vencimento: dt }).eq('id', editPgId);
+    if (error) return alert(error.message);
+  } else {
+    const parc = $('#pgf').value === 'parcelado';
+    const grupo = crypto.randomUUID();
+    let rows;
+    if (parc) {
+      // usa exatamente o vencimento e o valor que estão na tela, parcela por parcela
+      const ds = [...document.querySelectorAll('#pg-parc [data-pd]')].map(i => i.value);
+      const vs = [...document.querySelectorAll('#pg-parc [data-pv]')].map(i => parseFloat(i.value));
+      if (!ds.length || ds.some(d => !d) || vs.some(n => isNaN(n) || n <= 0))
+        return alert('Preencha o vencimento e o valor de todas as parcelas.');
+      const soma = Math.round(vs.reduce((a, b) => a + b, 0) * 100) / 100;
+      if (Math.abs(soma - v) > 0.005 &&
+          !confirm(`A soma das parcelas (${brl(soma)}) é diferente do valor total (${brl(v)}). Lançar mesmo assim?`)) return;
+      rows = ds.map((d, i) => ({
+        categoria_id: cat, conta_id: cb, data_lancamento: dl, descricao: desc, forma: 'parcelado',
+        parcela: i + 1, parcelas: ds.length, grupo, valor: vs[i], vencimento: d
+      }));
+    } else {
+      rows = [{ categoria_id: cat, conta_id: cb, data_lancamento: dl, descricao: desc, forma: 'vista', parcela: 1, parcelas: 1, grupo, valor: v, vencimento: dt }];
+    }
+    const { error } = await db.from('contas_pagar').insert(rows);
+    if (error) return alert(error.message);
+  }
+  $('#pg').close();
+  vPagar();
+}
+
+function abrirBaixa(id) {
+  const x = pagarLista.find(l => l.id === id);
+  if (!x) return;
+  baixaId = id;
+  $('#bx-info').textContent = `${x.descricao || 'Sem descrição'} • venc. ${br(x.vencimento)}` +
+    (x.forma === 'parcelado' ? ` • parcela ${x.parcela}/${x.parcelas}` : '');
+  $('#bxc').innerHTML = contas.filter(c => c.ativo).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  if (x.conta_id) $('#bxc').value = x.conta_id;
+  $('#bxd').value = hoje();
+  $('#bxv').value = x.valor;
+  $('#bx').showModal();
+}
+
+async function confirmarBaixa() {
+  const x = pagarLista.find(l => l.id === baixaId);
+  const v = parseFloat($('#bxv').value), dt = $('#bxd').value, cb = +$('#bxc').value;
+  if (!x || !dt || !cb || isNaN(v) || v <= 0) return alert('Informe data, conta e valor pago.');
+  const desc = ((x.descricao || '') + (x.forma === 'parcelado' ? ` (${x.parcela}/${x.parcelas})` : '')).trim();
+  // 1) cria o lançamento na conta corrente
+  const { data: r, error } = await db.from('realizado')
+    .insert({ categoria_id: x.categoria_id, conta_id: cb, data: dt, descricao: desc, valor: v })
+    .select('id').single();
+  if (error) return alert(error.message);
+  // 2) marca como pago; se falhar, desfaz o lançamento
+  const { error: e2 } = await db.from('contas_pagar')
+    .update({ pago: true, data_pagamento: dt, conta_id: cb, valor_pago: v, realizado_id: r.id }).eq('id', x.id);
+  if (e2) { await db.from('realizado').delete().eq('id', r.id); return alert(e2.message); }
+  $('#bx').close();
+  vPagar();
+}
+
+async function estornarPagar(id) {
+  const x = pagarLista.find(l => l.id === id);
+  if (!x || !confirm('Estornar o pagamento? O lançamento sai da conta corrente e a conta volta para "em aberto".')) return;
+  if (x.realizado_id) {
+    const { error } = await db.from('realizado').delete().eq('id', x.realizado_id);
+    if (error) return alert(error.message);
+  }
+  const { error } = await db.from('contas_pagar')
+    .update({ pago: false, data_pagamento: null, valor_pago: null, realizado_id: null }).eq('id', id);
+  error ? alert(error.message) : vPagar();
+}
+
+async function delPagar(id) {
+  if (!confirm('Excluir esta conta a pagar?')) return;
+  const { error } = await db.from('contas_pagar').delete().eq('id', id);
+  error ? alert(error.message) : vPagar();
+}
+
+$('#pg-x').onclick = () => $('#pg').close();
+$('#bx-x').onclick = () => $('#bx').close();
+$('#pg').addEventListener('click', e => { if (e.target.id === 'pg') $('#pg').close(); });
+$('#bx').addEventListener('click', e => { if (e.target.id === 'bx') $('#bx').close(); });
+
+// Enter: vai para o próximo campo; no último, lança. As parcelas entram na sequência.
+$('#pg').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  gerarParcelas();   // garante que a lista de parcelas está atualizada antes de montar a ordem
+  const fixos = ['pgl', 'pgb', 'pgc', 'pgd', 'pgv'];
+  if (!editPgId) { fixos.push('pgf'); if ($('#pgf').value === 'parcelado') fixos.push('pgn'); }
+  fixos.push('pgdt');
+  const ord = [...fixos.map(i => $('#' + i)), ...document.querySelectorAll('#pg-parc input')];
+  const i = ord.indexOf(e.target);
+  if (i < 0) return;                       // botões etc.: comportamento normal
+
+  if (e.target.id === 'pgc') {
+    // categoria: só avança se o texto bater com uma categoria da lista
+    setTimeout(() => { if (catPgPorTexto($('#pgc').value)) $('#pgd').focus(); }, 0);
+    return;
+  }
+
+  e.preventDefault();
+  if (i === ord.length - 1) salvarPagar();   // último campo: lança
+  else ord[i + 1].focus();
+});
+
+/* ---------- Contas a receber ---------- */
+let receberFiltro = 'abertas', receberLista = [], editCrId = null, recebeId = null, mapaCatCr = {}, sigParcCr = '';
+
+function catCrPorTexto(t) {
+  t = norm((t || '').trim());
+  if (!t) return null;
+  const k = Object.keys(mapaCatCr).find(k => norm(k) === t);
+  return k ? mapaCatCr[k] : null;
+}
+
+async function vReceber() {
+  $('#view').className = 'simples';
+  let data;
+  try {
+    data = await todos(() => {
+      let s = db.from('contas_receber').select('*');
+      s = receberFiltro === 'atrasadas'
+        ? s.eq('recebido', false).lt('vencimento', hoje())          // atrasadas: ignora o período
+        : s.gte('vencimento', ini()).lt('vencimento', fim());
+      return s.order('vencimento').order('id');
+    });
+  } catch (err) { return alert(err.message); }
+  receberLista = data;
+
+  const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
+  const CB = Object.fromEntries(contas.map(c => [c.id, c.nome]));
+  const h = hoje();
+  const soma = a => a.reduce((s, x) => s + +x.valor, 0);
+  const cardCr = (t, v, cor) => `<div class="card" style="padding:14px 18px;min-width:190px"><small style="color:var(--mut)">${t}</small>
+    <div style="font-size:20px;font-weight:700;color:${cor || 'inherit'}">${brl(v)}</div></div>`;
+  const status = x => x.recebido ? `<span style="color:var(--pri)">Recebido em ${br(x.data_recebimento)}</span>`
+    : x.vencimento < h ? '<span class="neg">Atrasada</span>' : '<span style="color:var(--acc)">Em aberto</span>';
+
+  const lista = data.filter(x =>
+    (receberFiltro === 'abertas' ? !x.recebido : receberFiltro === 'recebidas' ? x.recebido : true) &&
+    casaLanc(x, N[x.categoria_id]));
+
+  const abertas = data.filter(x => !x.recebido);
+  const sf = v => ' selected'.repeat(receberFiltro === v);
+
+  $('#view').innerHTML = `
+    <div class="row"><button class="p" onclick="abrirReceber()">+ Nova conta a receber</button>
+      <select onchange="receberFiltro=this.value;vReceber()" aria-label="Situação">
+        <option value="abertas"${sf('abertas')}>Não recebidas</option>
+        <option value="recebidas"${sf('recebidas')}>Recebidas</option>
+        <option value="todas"${sf('todas')}>Todas</option>
+        <option value="atrasadas"${sf('atrasadas')}>Atrasadas (qualquer data)</option>
+      </select>
+      ${campoBusca()}</div>
+    <div class="row">
+      ${cardCr('A receber no período', soma(abertas.filter(x => x.vencimento >= h)))}
+      ${cardCr('Atrasadas', soma(abertas.filter(x => x.vencimento < h)), 'var(--bad)')}
+      ${cardCr('Recebidas no período', soma(data.filter(x => x.recebido)), 'var(--pri)')}
+    </div>
+    <div class="scroll"><table>
+      <tr><th>Lançamento</th><th>Vencimento</th><th style="text-align:left">Conta</th><th style="text-align:left">Categoria</th><th style="text-align:left">Descrição</th><th>Forma</th><th>Valor</th><th>Situação</th><th></th></tr>
+      ${lista.map(x => `<tr><td>${br(x.data_lancamento)}</td><td>${br(x.vencimento)}</td><td style="text-align:left">${esc(CB[x.conta_id] || '')}</td>
+        <td style="text-align:left">${esc(N[x.categoria_id])}</td><td style="text-align:left">${esc(x.descricao)}</td>
+        <td>${x.forma === 'vista' ? 'À vista' : `Parcela ${x.parcela}/${x.parcelas}`}</td>
+        <td>${brl(x.valor)}</td><td>${status(x)}</td>
+        <td>${x.recebido
+          ? `<button class="l" onclick="estornarReceber(${x.id})">Estornar</button>`
+          : `<button class="l" style="color:var(--pri)" onclick="abrirRecebimento(${x.id})">Receber</button>
+             <button class="l" style="color:var(--pri)" onclick="abrirReceber(${x.id})">Editar</button>
+             <button class="l" onclick="delReceber(${x.id})">Excluir</button>`}</td></tr>`).join('')
+        || '<tr><td colspan="9" class="empty">Nenhuma conta encontrada.</td></tr>'}
+      <tr class="tot"><td colspan="6">Total listado (${lista.length})</td><td>${brl(soma(lista))}</td><td colspan="2"></td></tr>
+    </table></div>`;
+}
+
+function toggleCrForma() {
+  $('#crn-l').style.display = $('#crf').value === 'parcelado' ? 'grid' : 'none';
+  gerarParcelasCr(true);
+}
+
+// monta uma linha por parcela (vencimento + valor), todas editáveis
+function gerarParcelasCr(force) {
+  const box = $('#cr-parc'), soma = $('#cr-soma');
+  if (editCrId || $('#crf').value !== 'parcelado') {
+    box.style.display = 'none'; box.innerHTML = ''; soma.style.display = 'none'; sigParcCr = '';
+    return;
+  }
+  const n = Math.min(60, Math.max(2, parseInt($('#crn').value) || 2));
+  $('#crn').value = n;
+  const v = parseFloat($('#crv').value) || 0, dt = $('#crdt').value || hoje();
+  const sig = [n, v, dt].join('|');
+  if (!force && sig === sigParcCr && box.children.length) return;   // nada mudou: preserva o que foi editado
+  sigParcCr = sig;
+  const cent = Math.round(v * 100), base = Math.floor(cent / n);
+  box.style.display = 'grid'; soma.style.display = 'block';
+  box.innerHTML = Array.from({ length: n }, (_, i) => `
+    <div style="display:grid;grid-template-columns:34px 1fr 1fr;gap:8px;align-items:center">
+      <small style="color:var(--mut)">${i + 1}/${n}</small>
+      <input type="date" data-pd value="${addMes(dt, i)}" aria-label="Vencimento da parcela ${i + 1}">
+      <input type="number" step="0.01" data-pv value="${((i === n - 1 ? cent - base * (n - 1) : base) / 100).toFixed(2)}"
+             oninput="somaParcelasCr()" aria-label="Valor da parcela ${i + 1}">
+    </div>`).join('');
+  somaParcelasCr();
+}
+
+function somaParcelasCr() {
+  const s = [...document.querySelectorAll('#cr-parc [data-pv]')].reduce((a, i) => a + (parseFloat(i.value) || 0), 0);
+  const tot = parseFloat($('#crv').value) || 0;
+  const dif = Math.round((s - tot) * 100) / 100;
+  $('#cr-soma').innerHTML = `Soma das parcelas: <b>${brl(s)}</b>` +
+    (dif ? ` <span class="neg">(${dif > 0 ? '+' : ''}${brl(dif)} em relação ao valor total)</span>` : '');
+}
+
+function abrirReceber(id) {
+  const x = id ? receberLista.find(l => l.id === id) : null;
+  editCrId = x ? x.id : null;
+  mapaCatCr = {};
+  cats.filter(c => c.ativo && c.tipo === 'receita' && !ehTransf(c)).forEach(c => mapaCatCr[c.nome] = c.id);
+  if (x && !Object.values(mapaCatCr).includes(x.categoria_id)) {
+    const c = cats.find(c => c.id === x.categoria_id);
+    mapaCatCr[`${c ? c.nome : 'Categoria ' + x.categoria_id} (inativa)`] = x.categoria_id;
+  }
+  $('#crc-list').innerHTML = Object.keys(mapaCatCr).map(k => `<option value="${esc(k)}">`).join('');
+  $('#crl').value = x ? (x.data_lancamento || hoje()) : hoje();
+  $('#crb').innerHTML = contas.filter(c => c.ativo || (x && x.conta_id === c.id))
+    .map(c => `<option value="${c.id}">${esc(c.nome)}${c.ativo ? '' : ' (inativa)'}</option>`).join('');
+  $('#crb').value = (x && x.conta_id) ? x.conta_id : ((contas.find(c => c.ativo) || {}).id || '');
+  $('#crc').value = x ? (Object.keys(mapaCatCr).find(k => mapaCatCr[k] === x.categoria_id) || '') : '';
+  $('#crd').value = x ? (x.descricao || '') : '';
+  $('#crv').value = x ? x.valor : '';
+  $('#crdt').value = x ? x.vencimento : hoje();
+  $('#crf').value = 'vista'; $('#crn').value = 2;
+  $('#cr-forma').style.display = x ? 'none' : 'grid';   // edição: só ajusta aquela parcela
+  toggleCrForma();
+  $('#cr-t').textContent = x ? 'Editar conta a receber' : 'Nova conta a receber';
+  $('#crbtn').textContent = x ? 'Salvar alteração' : 'Lançar';
+  $('#cr').showModal();
+  (x ? $('#crv') : $('#crl')).focus();
+}
+
+async function salvarReceber() {
+  const cat = catCrPorTexto($('#crc').value), v = parseFloat($('#crv').value), dt = $('#crdt').value;
+  const dl = $('#crl').value, cb = +$('#crb').value;
+  if (!cat || !dt || !dl || !cb || isNaN(v) || v <= 0)
+    return alert('Informe data do lançamento, conta, categoria (escolha uma da lista), valor e vencimento.');
+  const desc = $('#crd').value.trim();
+  if (editCrId) {
+    const { error } = await db.from('contas_receber')
+      .update({ categoria_id: cat, conta_id: cb, data_lancamento: dl, descricao: desc, valor: v, vencimento: dt }).eq('id', editCrId);
+    if (error) return alert(error.message);
+  } else {
+    const parc = $('#crf').value === 'parcelado';
+    const grupo = crypto.randomUUID();
+    let rows;
+    if (parc) {
+      // usa exatamente o vencimento e o valor que estão na tela, parcela por parcela
+      const ds = [...document.querySelectorAll('#cr-parc [data-pd]')].map(i => i.value);
+      const vs = [...document.querySelectorAll('#cr-parc [data-pv]')].map(i => parseFloat(i.value));
+      if (!ds.length || ds.some(d => !d) || vs.some(n => isNaN(n) || n <= 0))
+        return alert('Preencha o vencimento e o valor de todas as parcelas.');
+      const soma = Math.round(vs.reduce((a, b) => a + b, 0) * 100) / 100;
+      if (Math.abs(soma - v) > 0.005 &&
+          !confirm(`A soma das parcelas (${brl(soma)}) é diferente do valor total (${brl(v)}). Lançar mesmo assim?`)) return;
+      rows = ds.map((d, i) => ({
+        categoria_id: cat, conta_id: cb, data_lancamento: dl, descricao: desc, forma: 'parcelado',
+        parcela: i + 1, parcelas: ds.length, grupo, valor: vs[i], vencimento: d
+      }));
+    } else {
+      rows = [{ categoria_id: cat, conta_id: cb, data_lancamento: dl, descricao: desc, forma: 'vista',
+                parcela: 1, parcelas: 1, grupo, valor: v, vencimento: dt }];
+    }
+    const { error } = await db.from('contas_receber').insert(rows);
+    if (error) return alert(error.message);
+  }
+  $('#cr').close();
+  vReceber();
+}
+
+function abrirRecebimento(id) {
+  const x = receberLista.find(l => l.id === id);
+  if (!x) return;
+  recebeId = id;
+  $('#rx-info').textContent = `${x.descricao || 'Sem descrição'} • venc. ${br(x.vencimento)}` +
+    (x.forma === 'parcelado' ? ` • parcela ${x.parcela}/${x.parcelas}` : '');
+  $('#rxc').innerHTML = contas.filter(c => c.ativo).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  if (x.conta_id) $('#rxc').value = x.conta_id;
+  $('#rxd').value = hoje();
+  $('#rxv').value = x.valor;
+  $('#rx').showModal();
+}
+
+async function confirmarRecebimento() {
+  const x = receberLista.find(l => l.id === recebeId);
+  const v = parseFloat($('#rxv').value), dt = $('#rxd').value, cb = +$('#rxc').value;
+  if (!x || !dt || !cb || isNaN(v) || v <= 0) return alert('Informe data, conta e valor recebido.');
+  const desc = ((x.descricao || '') + (x.forma === 'parcelado' ? ` (${x.parcela}/${x.parcelas})` : '')).trim();
+  // 1) cria o lançamento na conta corrente (receita: entra no saldo)
+  const { data: r, error } = await db.from('realizado')
+    .insert({ categoria_id: x.categoria_id, conta_id: cb, data: dt, descricao: desc, valor: v })
+    .select('id').single();
+  if (error) return alert(error.message);
+  // 2) marca como recebido; se falhar, desfaz o lançamento
+  const { error: e2 } = await db.from('contas_receber')
+    .update({ recebido: true, data_recebimento: dt, conta_id: cb, valor_recebido: v, realizado_id: r.id }).eq('id', x.id);
+  if (e2) { await db.from('realizado').delete().eq('id', r.id); return alert(e2.message); }
+  $('#rx').close();
+  vReceber();
+}
+
+async function estornarReceber(id) {
+  const x = receberLista.find(l => l.id === id);
+  if (!x || !confirm('Estornar o recebimento? O lançamento sai da conta corrente e a conta volta para "em aberto".')) return;
+  if (x.realizado_id) {
+    const { error } = await db.from('realizado').delete().eq('id', x.realizado_id);
+    if (error) return alert(error.message);
+  }
+  const { error } = await db.from('contas_receber')
+    .update({ recebido: false, data_recebimento: null, valor_recebido: null, realizado_id: null }).eq('id', id);
+  error ? alert(error.message) : vReceber();
+}
+
+async function delReceber(id) {
+  if (!confirm('Excluir esta conta a receber?')) return;
+  const { error } = await db.from('contas_receber').delete().eq('id', id);
+  error ? alert(error.message) : vReceber();
+}
+
+$('#cr-x').onclick = () => $('#cr').close();
+$('#rx-x').onclick = () => $('#rx').close();
+$('#cr').addEventListener('click', e => { if (e.target.id === 'cr') $('#cr').close(); });
+$('#rx').addEventListener('click', e => { if (e.target.id === 'rx') $('#rx').close(); });
+
+// Enter: vai para o próximo campo; no último, lança. As parcelas entram na sequência.
+$('#cr').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  gerarParcelasCr();   // garante que a lista de parcelas está atualizada antes de montar a ordem
+  const fixos = ['crl', 'crb', 'crc', 'crd', 'crv'];
+  if (!editCrId) { fixos.push('crf'); if ($('#crf').value === 'parcelado') fixos.push('crn'); }
+  fixos.push('crdt');
+  const ord = [...fixos.map(i => $('#' + i)), ...document.querySelectorAll('#cr-parc input')];
+  const i = ord.indexOf(e.target);
+  if (i < 0) return;                       // botões etc.: comportamento normal
+
+  if (e.target.id === 'crc') {
+    // categoria: só avança se o texto bater com uma categoria da lista
+    setTimeout(() => { if (catCrPorTexto($('#crc').value)) $('#crd').focus(); }, 0);
+    return;
+  }
+
+  e.preventDefault();
+  if (i === ord.length - 1) salvarReceber();   // último campo: lança
+  else ord[i + 1].focus();
+});
+
+/* ---------- Cotação diária (arroba) ---------- */
+const ESTADO_PRINCIPAL = 'TO';
+// ordem de exibição dos demais estados (edite como quiser); o principal sempre vem primeiro
+const NOME_EST = { TO: 'Tocantins', GO: 'Goiás', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', PA: 'Pará',
+  MA: 'Maranhão', BA: 'Bahia', MG: 'Minas Gerais', SP: 'São Paulo', RO: 'Rondônia', PR: 'Paraná', RS: 'Rio Grande do Sul' };
+const ordemEst = () => [ESTADO_PRINCIPAL, ...Object.keys(NOME_EST).filter(e => e !== ESTADO_PRINCIPAL)];
+const PRODUTOS_COT = ['Boi gordo', 'Vaca gorda', 'Novilha'];
+let cotProd = 'Boi gordo';
+
+function graficoLinha(pts) {   // pts: [{data, valor}] em ordem crescente de data
+  if (pts.length < 2) return '<p class="empty">Lance pelo menos 2 dias para ver o gráfico.</p>';
+  const W = 900, H = 260, L = 64, R = 14, Tp = 12, B = 30;
+  const vals = pts.map(p => +p.valor);
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  if (mn === mx) { mn -= 1; mx += 1; }
+  const pad = (mx - mn) * 0.15; mn -= pad; mx += pad;
+  const X = i => L + (W - L - R) * i / (pts.length - 1);
+  const Y = v => Tp + (H - Tp - B) * (1 - (v - mn) / (mx - mn));
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = mn + (mx - mn) * i / 4, y = Y(v);
+    g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#1b3a2a"/><text x="${L - 8}" y="${y + 4}" text-anchor="end" fill="#8aa596" font-size="11">${v.toFixed(0)}</text>`;
+  }
+  g += `<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(+p.valor).toFixed(1)}`).join(' ')}" fill="none" stroke="#2fd46f" stroke-width="2.5" stroke-linejoin="round"/>`;
+  pts.forEach((p, i) => { g += `<circle cx="${X(i)}" cy="${Y(+p.valor)}" r="3.5" fill="#2fd46f"><title>${br(p.data)}: ${brl(p.valor)}</title></circle>`; });
+  const passo = Math.ceil(pts.length / 8);
+  pts.forEach((p, i) => {
+    if (i % passo === 0 || i === pts.length - 1)
+      g += `<text x="${X(i)}" y="${H - 8}" text-anchor="middle" fill="#8aa596" font-size="11">${p.data.slice(8)}/${p.data.slice(5, 7)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Evolução da arroba">${g}</svg>`;
+}
+
+async function vCotacao() {
+  $('#view').className = 'simples';
+  let data;
+  try {
+    const desde = iso(new Date(Date.now() - 60 * 864e5));
+    data = await todos(() => db.from('cotacoes').select('*').eq('produto', cotProd)
+      .gte('data', desde).order('data', { ascending: false }).order('id'));
+  } catch (err) { return alert(err.message); }
+
+  const porEst = {};
+  data.forEach(x => (porEst[x.estado] ||= []).push(x));   // já vem da mais nova para a mais antiga
+  const info = e => {
+    const l = porEst[e] || [], a = l[0], b = l[1];
+    if (!a) return null;
+    return { a, dif: b ? a.valor - b.valor : null, pc: b && +b.valor ? (a.valor - b.valor) / b.valor * 100 : null };
+  };
+  const varH = i => !i || i.dif === null ? '<span style="color:var(--mut)">—</span>'
+    : `<span style="color:${i.dif < 0 ? 'var(--bad)' : i.dif > 0 ? 'var(--pri)' : 'var(--mut)'}">${i.dif > 0 ? '▲' : i.dif < 0 ? '▼' : '='} ${brl(Math.abs(i.dif))} (${i.pc.toFixed(1).replace('.', ',')}%)</span>`;
+
+  const t = info(ESTADO_PRINCIPAL);
+  const serie = (porEst[ESTADO_PRINCIPAL] || []).slice(0, 30).reverse();
+  const outros = ordemEst().filter(e => e !== ESTADO_PRINCIPAL);
+
+  $('#view').innerHTML = `
+    <div class="row"><button class="p" onclick="abrirCot()">+ Lançar cotações do dia</button>
+      <button class="p" id="cot-auto" style="background:none;border:1px solid var(--bd);color:var(--tx)" onclick="atualizarCotAuto()">Atualizar automático</button>
+      <select onchange="cotProd=this.value;vCotacao()" aria-label="Produto">
+        ${PRODUTOS_COT.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
+      <span class="periodo">Preço da arroba (R$/@) • independe do filtro de datas</span></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px">
+      <div class="card" style="padding:18px 20px">
+        <small style="color:var(--mut)">${NOME_EST[ESTADO_PRINCIPAL]} • ${cotProd}</small>
+        <div style="font-size:36px;font-weight:700;margin:4px 0">${t ? brl(t.a.valor) : '—'}</div>
+        <div>${t ? `${br(t.a.data)} &nbsp; ${varH(t)}` : '<span style="color:var(--mut)">Nenhuma cotação lançada ainda.</span>'}</div>
+        ${t && t.a.fonte ? `<small style="color:var(--mut)">Fonte: ${esc(t.a.fonte)}</small>` : ''}
+      </div>
+      <div class="card" style="padding:16px 18px;grid-column:span 2;min-width:0">
+        <b>${NOME_EST[ESTADO_PRINCIPAL]} - últimos ${serie.length} lançamentos</b>
+        ${graficoLinha(serie)}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <h3>Outros estados</h3>
+      <div class="scroll"><table>
+        <tr><th style="text-align:left">Estado</th><th>Data</th><th>Arroba</th><th>Variação</th><th>Diferença p/ ${ESTADO_PRINCIPAL}</th></tr>
+        ${outros.map(e => {
+          const i = info(e);
+          const d = i && t ? i.a.valor - t.a.valor : null;
+          return `<tr><td style="text-align:left">${NOME_EST[e]} (${e})</td><td>${i ? br(i.a.data) : '—'}</td>
+            <td>${i ? brl(i.a.valor) : '—'}</td><td>${varH(i)}</td>
+            <td class="${d !== null && d < 0 ? 'neg' : ''}">${d === null ? '—' : (d > 0 ? '+' : '') + brl(d)}</td></tr>`;
+        }).join('')}
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h3>Histórico - ${NOME_EST[ESTADO_PRINCIPAL]}</h3>
+      <div class="scroll"><table>
+        <tr><th>Data</th><th>Arroba</th><th style="text-align:left">Fonte</th><th></th></tr>
+        ${(porEst[ESTADO_PRINCIPAL] || []).slice(0, 15).map(x => `<tr><td>${br(x.data)}</td><td>${brl(x.valor)}</td>
+          <td style="text-align:left">${esc(x.fonte)}</td>
+          <td><button class="l" onclick="delCot(${x.id})">Excluir</button></td></tr>`).join('')
+          || '<tr><td colspan="4" class="empty">Sem lançamentos.</td></tr>'}
+      </table></div>
+    </div>`;
+}
+
+async function abrirCot() {
+  $('#cotd').value = hoje();
+  $('#cotp').innerHTML = PRODUTOS_COT.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('');
+  $('#cotf').value = '';
+  $('#cot-lin').innerHTML = ordemEst().map(e => `
+    <div style="display:grid;grid-template-columns:1fr 140px;gap:8px;align-items:center">
+      <span>${NOME_EST[e]} (${e})</span>
+      <input type="number" step="0.01" data-e="${e}" placeholder="R$ / @" aria-label="Arroba ${NOME_EST[e]}">
+    </div>`).join('');
+  $('#cot').showModal();
+  await carregarCot();
+  $('#cot-lin input').focus();
+}
+
+// ao trocar data ou produto, traz o que já foi lançado (salvar de novo substitui o valor)
+async function carregarCot() {
+  document.querySelectorAll('#cot-lin input').forEach(i => i.value = '');
+  if (!$('#cotd').value) return;
+  const { data, error } = await db.from('cotacoes').select('estado,valor,fonte')
+    .eq('data', $('#cotd').value).eq('produto', $('#cotp').value);
+  if (error) return alert(error.message);
+  (data || []).forEach(x => {
+    const i = document.querySelector(`#cot-lin [data-e="${x.estado}"]`);
+    if (i) i.value = x.valor;
+  });
+  if (data && data[0] && data[0].fonte && !$('#cotf').value) $('#cotf').value = data[0].fonte;
+}
+
+async function salvarCot() {
+  const dt = $('#cotd').value, prod = $('#cotp').value, fonte = $('#cotf').value.trim() || null;
+  if (!dt) return alert('Informe a data.');
+  const rows = [...document.querySelectorAll('#cot-lin [data-e]')]
+    .filter(i => i.value !== '' && +i.value > 0)
+    .map(i => ({ data: dt, estado: i.dataset.e, produto: prod, valor: +i.value, fonte }));
+  if (!rows.length) return alert('Informe pelo menos uma cotação.');
+  const { error } = await db.from('cotacoes').upsert(rows, { onConflict: 'data,estado,produto' });
+  if (error) return alert(error.message);
+  $('#cot').close();
+  cotProd = prod;
+  vCotacao();
+}
+
+async function delCot(id) {
+  if (!confirm('Excluir esta cotação?')) return;
+  const { error } = await db.from('cotacoes').delete().eq('id', id);
+  error ? alert(error.message) : vCotacao();
+}
+
+async function atualizarCotAuto() {
+  const b = $('#cot-auto');
+  b.disabled = true; b.textContent = 'Buscando...';
+  try {
+    const { data, error } = await db.functions.invoke('cotacoes-auto', { body: {} });
+    if (error) {
+      const corpo = error.context && await error.context.json().catch(() => null);
+      throw new Error((corpo && corpo.erro) || error.message);
+    }
+    if (!data || !data.ok) throw new Error((data && data.erro) || 'Falha ao buscar');
+    alert(`Cotações atualizadas: ${data.gravadas} registro(s).`);
+    vCotacao();
+  } catch (err) {
+    alert('Não foi possível atualizar: ' + (err.message || err));
+  } finally {
+    b.disabled = false; b.textContent = 'Atualizar automático';
+  }
+}
+
+$('#cot-x').onclick = () => $('#cot').close();
+$('#cot').addEventListener('click', e => { if (e.target.id === 'cot') $('#cot').close(); });
+
+// Enter: vai para o próximo campo; no último (RS), salva
+$('#cot').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const ord = [$('#cotd'), $('#cotp'), $('#cotf'), ...document.querySelectorAll('#cot-lin input')];
+  const i = ord.indexOf(e.target);
+  if (i < 0) return;                       // botões etc.: comportamento normal
+  e.preventDefault();
+  if (i === ord.length - 1) salvarCot();
+  else ord[i + 1].focus();
+});
+
 
 /* ---------- Backup ---------- */
 $('#bk').onclick = async () => {
