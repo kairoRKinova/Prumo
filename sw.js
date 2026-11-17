@@ -1,4 +1,4 @@
-const CACHE = 'prumo-v2';
+const CACHE = 'prumo-v6';
 const CASCA = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
