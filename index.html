@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Prumo Gestão Financeira</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Bitter:wght@600&display=swap">
-<link rel="stylesheet" href="style.css?v=1"></head>
+<link rel="stylesheet" href="style.css?v=4"></head>
 <body>
 
 <div id="login" hidden>
@@ -31,10 +31,13 @@
     <nav id="tabs">
       <button data-t="painel" class="on"><svg class="ic" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Painel</span></button>
       <button data-t="realizado"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span>Conta corrente</span></button>
+      <button data-t="receber"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M14 15h4"/></svg><span>Contas a receber</span></button>
+      <button data-t="pagar"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg><span>Contas a pagar</span></button>
       <button data-t="previsto"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Previsto</span></button>
       <button data-t="categorias"><svg class="ic" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Plano de contas</span></button>
       <button data-t="relatorios"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h8"/></svg><span>Relatórios</span></button>
       <button data-t="resultados"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Resultados</span></button>
+      <button data-t="cotacao"><svg class="ic" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Cotação</span></button>
       <button data-t="usuarios" hidden><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.2c2.2.5 3.5 2.2 3.5 4.8"/></svg><span>Usuários</span></button>
     </nav>
     <div class="rodape">
@@ -99,10 +102,100 @@
       <div id="cbl"></div>
     </div>
   </dialog>
+<dialog id="pg" style="width:min(460px,94vw)">
+  <div class="dh"><h3 id="pg-t">Nova conta a pagar</h3><button id="pg-x">Fechar</button></div>
+  <div class="dc" style="padding:18px;display:grid;gap:12px">
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data do lançamento<input type="date" id="pgl"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Conta bancária<select id="pgb"></select></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Categoria
+      <input id="pgc" list="pgc-list" placeholder="Digite para pesquisar..." autocomplete="off">
+      <datalist id="pgc-list"></datalist>
+    </label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Descrição<input id="pgd" placeholder="Descrição"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Valor total<input id="pgv" type="number" step="0.01" placeholder="0,00" onchange="gerarParcelas()"></label>
+    <div id="pg-forma" style="display:grid;gap:12px">
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Forma de pagamento
+        <select id="pgf" onchange="togglePgForma()"><option value="vista">À vista</option><option value="parcelado">Parcelado</option></select></label>
+      <label id="pgn-l" style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Número de parcelas<input id="pgn" type="number" min="2" max="60" value="2" onchange="gerarParcelas()"></label>
+    </div>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Vencimento (1ª parcela)<input type="date" id="pgdt" onchange="gerarParcelas()"></label>
+    <div id="pg-parc" style="display:none;gap:6px;max-height:240px;overflow:auto"></div>
+    <small id="pg-soma" style="color:var(--mut);display:none"></small>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+      <button class="l" style="color:var(--mut)" onclick="$('#pg').close()">Cancelar</button>
+      <button class="p" id="pgbtn" onclick="salvarPagar()">Lançar</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="bx" style="width:min(420px,94vw)">
+  <div class="dh"><h3>Baixar conta</h3><button id="bx-x">Fechar</button></div>
+  <div class="dc" style="padding:18px;display:grid;gap:12px">
+    <p id="bx-info" style="margin:0;color:var(--mut)"></p>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data do pagamento<input type="date" id="bxd"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Conta bancária<select id="bxc"></select></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Valor pago<input id="bxv" type="number" step="0.01"></label>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+      <button class="l" style="color:var(--mut)" onclick="$('#bx').close()">Cancelar</button>
+      <button class="p" onclick="confirmarBaixa()">Confirmar baixa</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="cr" style="width:min(460px,94vw)">
+  <div class="dh"><h3 id="cr-t">Nova conta a receber</h3><button id="cr-x">Fechar</button></div>
+  <div class="dc" style="padding:18px;display:grid;gap:12px">
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data do lançamento<input type="date" id="crl"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Conta bancária<select id="crb"></select></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Categoria
+      <input id="crc" list="crc-list" placeholder="Digite para pesquisar..." autocomplete="off">
+      <datalist id="crc-list"></datalist>
+    </label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Descrição<input id="crd" placeholder="Descrição"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Valor total<input id="crv" type="number" step="0.01" placeholder="0,00" onchange="gerarParcelasCr()"></label>
+    <div id="cr-forma" style="display:grid;gap:12px">
+      <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Forma de recebimento
+        <select id="crf" onchange="toggleCrForma()"><option value="vista">À vista</option><option value="parcelado">Parcelado</option></select></label>
+      <label id="crn-l" style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Número de parcelas<input id="crn" type="number" min="2" max="60" value="2" onchange="gerarParcelasCr()"></label>
+    </div>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Vencimento (1ª parcela)<input type="date" id="crdt" onchange="gerarParcelasCr()"></label>
+    <div id="cr-parc" style="display:none;gap:6px;max-height:240px;overflow:auto"></div>
+    <small id="cr-soma" style="color:var(--mut);display:none"></small>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+      <button class="l" style="color:var(--mut)" onclick="$('#cr').close()">Cancelar</button>
+      <button class="p" id="crbtn" onclick="salvarReceber()">Lançar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="rx" style="width:min(420px,94vw)">
+  <div class="dh"><h3>Receber conta</h3><button id="rx-x">Fechar</button></div>
+  <div class="dc" style="padding:18px;display:grid;gap:12px">
+    <p id="rx-info" style="margin:0;color:var(--mut)"></p>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data do recebimento<input type="date" id="rxd"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Conta bancária<select id="rxc"></select></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Valor recebido<input id="rxv" type="number" step="0.01"></label>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+      <button class="l" style="color:var(--mut)" onclick="$('#rx').close()">Cancelar</button>
+      <button class="p" onclick="confirmarRecebimento()">Confirmar recebimento</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="cot" style="width:min(460px,94vw)">
+  <div class="dh"><h3>Lançar cotações do dia</h3><button id="cot-x">Fechar</button></div>
+  <div class="dc" style="padding:18px;display:grid;gap:12px">
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Data<input type="date" id="cotd" onchange="carregarCot()"></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Produto<select id="cotp" onchange="carregarCot()"></select></label>
+    <label style="display:grid;gap:4px;color:var(--mut);font-size:12.5px">Fonte (opcional)<input id="cotf" placeholder="Ex.: Scot, Notícias Agrícolas, frigorífico..."></label>
+    <div id="cot-lin" style="display:grid;gap:8px;max-height:300px;overflow:auto"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+      <button class="l" style="color:var(--mut)" onclick="$('#cot').close()">Cancelar</button>
+      <button class="p" onclick="salvarCot()">Salvar cotações</button>
+    </div>
+  </div>
+</dialog>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=1"></script></body>
+<script src="app.js?v=4"></script></body>
 </html>
