@@ -107,7 +107,8 @@ function aplicarPermissoes() {
   btns.forEach(x => x.classList.toggle('on', x === primeira));
   document.body.classList.toggle('sem-editar', !podeEditar());
   document.body.classList.toggle('sem-admin', !perm.admin);
-  $('#bk').hidden = !perm.admin;
+  const celular = matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+$('#bk').hidden = !perm.admin || celular;
   return true;
 }
 async function init() {
@@ -122,8 +123,12 @@ async function init() {
   $('#app').hidden = false;
   $('#pre').value = 'ano';   // mostra "Ano rural atual" no seletor
   preset('ano');             // 01/09 a 31/08 do ano rural em andamento
-  render();
+  render();                  // abre a tela inicial
+  autoCotDiaria();           // atualiza as cotações em segundo plano
 }
+
+
+
 $('#entrar').onclick = async () => {
   const { error } = await db.auth.signInWithPassword({ email: $('#em').value, password: $('#pw').value });
   error ? alert('Não foi possível entrar: ' + error.message) : location.reload();
@@ -145,15 +150,18 @@ $('#tabs').onclick = e => {
   render();
 };
 
-async function render() {
+let tCad = 0;
+async function render(forcar) {
   if (!$('#de').value || !$('#ate').value) return;
-  const [rc, rb] = await Promise.all([
-    db.from('categorias').select('*').order('tipo').order('nome'),
-    db.from('contas_bancarias').select('*').order('nome')
-  ]);
-  if (rc.error) return alert(rc.error.message);
-  if (rb.error) return alert(rb.error.message);
-  cats = rc.data; contas = rb.data;
+  if (forcar === true || !cats.length || Date.now() - tCad > 60000) {
+    const [rc, rb] = await Promise.all([
+      db.from('categorias').select('*').order('tipo').order('nome'),
+      db.from('contas_bancarias').select('*').order('nome')
+    ]);
+    if (rc.error) return alert(rc.error.message);
+    if (rb.error) return alert(rb.error.message);
+    cats = rc.data; contas = rb.data; tCad = Date.now();
+  }
   ({ painel: vPainel, realizado: vRealizado, pagar: vPagar, receber: vReceber, cotacao: vCotacao, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados, usuarios: vUsuarios })[tab]();
 }
 
@@ -392,12 +400,17 @@ async function vRealizado() {
   const cartao = (t, v) => `<div class="card" style="padding:14px 18px;min-width:190px"><small style="color:var(--mut)">${t}</small><div style="font-size:20px;font-weight:700"${neg(v)}>${brl(v)}</div></div>`;
   const sub = t => `<p style="color:var(--mut);margin:18px 0 6px;font-weight:600">${t}</p>`;
 
-  // tudo até o fim do período (precisa do histórico para o saldo de abertura)
-  const todosLanc = await todos(() => {
-    let s = db.from('realizado').select('*').lt('data', ate);
-    if (contaSel && contaSel !== 'sep') s = s.eq('conta_id', +contaSel);
-    return s.order('data').order('id');
-  });
+  // só o período; o saldo anterior vem pronto do banco
+  const [todosLanc, ant] = await Promise.all([
+    todos(() => {
+      let s = db.from('realizado').select('*').gte('data', de).lt('data', ate);
+      if (contaSel && contaSel !== 'sep') s = s.eq('conta_id', +contaSel);
+      return s.order('data').order('id');
+    }),
+    db.rpc('saldo_anterior', { p_data: de })
+  ]);
+  if (ant.error) return alert(ant.error.message);
+  const ANT = Object.fromEntries(ant.data.map(x => [x.conta_id, +x.saldo]));
 
   lancs = [];
 
@@ -405,7 +418,7 @@ async function vRealizado() {
   const relConta = (escopo, titulo) => {
     const ids = new Set(escopo.map(c => c.id));
     const cur = {};
-    escopo.forEach(c => cur[c.id] = +c.saldo_inicial);
+    escopo.forEach(c => cur[c.id] = +c.saldo_inicial + (ANT[c.id] || 0));
     const periodo = [];
     todosLanc.filter(x => ids.has(x.conta_id)).forEach(x => {
       if (x.data < de) cur[x.conta_id] = (cur[x.conta_id] || 0) + sg(x);
@@ -459,7 +472,7 @@ async function vRealizado() {
   let blocos;
   if (!contas.length) blocos = '<p class="empty">Cadastre uma conta em "Contas bancárias".</p>';
   else if (contaSel === 'sep') blocos = contas
-    .filter(c => c.ativo || todosLanc.some(x => x.conta_id === c.id))
+    .filter(c => c.ativo || ANT[c.id] !== undefined || todosLanc.some(x => x.conta_id === c.id))
     .map(c => relConta([c], 'Conta: ' + c.nome)).join('');
   else if (contaSel) blocos = relConta(contas.filter(c => String(c.id) === String(contaSel)), '');
   else blocos = relConta(contas, contas.length > 1 ? 'Todas as contas juntas' : '');
@@ -692,12 +705,22 @@ function logoPng(cor = '#1f4d3a') {
   });
 }
 
+const carregarScript = src => new Promise((ok, err) => {
+  const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = err; document.head.appendChild(s);
+});
+async function garantirPdf() {
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) return;
+  await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+}
+
 async function gerarPdfContas() {
   const btn = $('#rp-pdf');
   btn.disabled = true; btn.textContent = 'Gerando...';
   try {
     const sel = $('#rp-conta').value;
     repSel = sel;
+    await garantirPdf();
     const { jsPDF } = window.jspdf;
     const T = Object.fromEntries(cats.map(c => [c.id, c.tipo]));
     const N = Object.fromEntries(cats.map(c => [c.id, c.nome]));
@@ -855,13 +878,15 @@ function rosca(titulo, mapa) {
 
 async function vResultados() {
   $('#view').className = '';
-  const [p, rm, rows] = await Promise.all([
+    const [p, rm, rows, ant] = await Promise.all([
     db.from('previsto').select('categoria_id,valor').gte('mes', iniAno()).lt('mes', fimAno()),
     db.from('realizado_mensal').select('categoria_id,total').gte('mes', iniAno()).lt('mes', fimAno()),
-    todos(() => db.from('realizado').select('categoria_id,conta_id,data,valor').lt('data', fim()).order('id'))
+    todos(() => db.from('realizado').select('categoria_id,conta_id,data,valor').gte('data', ini()).lt('data', fim()).order('id')),
+    db.rpc('saldo_anterior', { p_data: ini() })
   ]);
   if (p.error) return alert(p.error.message);
   if (rm.error) return alert(rm.error.message);
+  if (ant.error) return alert(ant.error.message);
 
   const C = Object.fromEntries(cats.map(c => [c.id, c]));
   // rec = receita | inv = despesa de investimento | des = demais despesas
@@ -878,6 +903,7 @@ async function vResultados() {
   const rk = { rec: {}, des: {}, inv: {} };
   const pcat = { rec: {}, des: {} };
   const saldoConta = Object.fromEntries(contas.map(c => [c.id, +c.saldo_inicial]));
+  ant.data.forEach(x => saldoConta[x.conta_id] = (saldoConta[x.conta_id] || 0) + +x.saldo);
 
   rows.forEach(x => {
     const g = gr(x.categoria_id), v = +x.valor;
@@ -1631,8 +1657,18 @@ const ESTADO_PRINCIPAL = 'TO';
 const NOME_EST = { TO: 'Tocantins', GO: 'Goiás', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', PA: 'Pará',
   MA: 'Maranhão', BA: 'Bahia', MG: 'Minas Gerais', SP: 'São Paulo', RO: 'Rondônia', PR: 'Paraná', RS: 'Rio Grande do Sul' };
 const ordemEst = () => [ESTADO_PRINCIPAL, ...Object.keys(NOME_EST).filter(e => e !== ESTADO_PRINCIPAL)];
-const PRODUTOS_COT = ['Boi gordo', 'Vaca gorda', 'Novilha'];
+const PRODUTOS_COT = ['Boi gordo', 'Boi magro', 'Vaca boiadeira', 'Novilha 18 meses', 'Garrote',
+  'Desmama macho', 'Desmama fêmea', 'Bezerro', 'Bezerra', 'Milho', 'Soja'];
+const UNID_COT = {
+  'Boi gordo': 'R$/@', 'Boi magro': 'R$/cab', 'Vaca boiadeira': 'R$/cab',
+  'Novilha 18 meses': 'R$/cab', 'Garrote': 'R$/cab',
+  'Desmama macho': 'R$/cab', 'Desmama fêmea': 'R$/cab',
+  'Bezerro': 'R$/cab', 'Bezerra': 'R$/cab',
+  'Milho': 'R$/saca 60kg', 'Soja': 'R$/saca 60kg'
+};
+const unidCot = p => UNID_COT[p] || 'R$';
 let cotProd = 'Boi gordo';
+let autoCotRodou = false;   // evita repetir na mesma abertura do programa
 
 function graficoLinha(pts) {   // pts: [{data, valor}] em ordem crescente de data
   if (pts.length < 2) return '<p class="empty">Lance pelo menos 2 dias para ver o gráfico.</p>';
@@ -1646,7 +1682,7 @@ function graficoLinha(pts) {   // pts: [{data, valor}] em ordem crescente de dat
   let g = '';
   for (let i = 0; i <= 4; i++) {
     const v = mn + (mx - mn) * i / 4, y = Y(v);
-    g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#1b3a2a"/><text x="${L - 8}" y="${y + 4}" text-anchor="end" fill="#8aa596" font-size="11">${v.toFixed(0)}</text>`;
+    g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#1b3a2a"/><text x="${L - 8}" y="${y + 4}" text-anchor="end" fill="#8aa596" font-size="11">${v.toFixed(mx - mn < 10 ? 2 : 0)}</text>`;
   }
   g += `<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(+p.valor).toFixed(1)}`).join(' ')}" fill="none" stroke="#2fd46f" stroke-width="2.5" stroke-linejoin="round"/>`;
   pts.forEach((p, i) => { g += `<circle cx="${X(i)}" cy="${Y(+p.valor)}" r="3.5" fill="#2fd46f"><title>${br(p.data)}: ${brl(p.valor)}</title></circle>`; });
@@ -1682,15 +1718,14 @@ async function vCotacao() {
   const outros = ordemEst().filter(e => e !== ESTADO_PRINCIPAL);
 
   $('#view').innerHTML = `
-    <div class="row"><button class="p" onclick="abrirCot()">+ Lançar cotações do dia</button>
-      <button class="p" id="cot-auto" style="background:none;border:1px solid var(--bd);color:var(--tx)" onclick="atualizarCotAuto()">Atualizar automático</button>
+    <div class="row">
       <select onchange="cotProd=this.value;vCotacao()" aria-label="Produto">
-        ${PRODUTOS_COT.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
-      <span class="periodo">Preço da arroba (R$/@) • independe do filtro de datas</span></div>
+      ${PRODUTOS_COT.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
+      <span class="periodo">${cotProd}: ${unidCot(cotProd)} • independe do filtro de datas</span></div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px">
       <div class="card" style="padding:18px 20px">
-        <small style="color:var(--mut)">${NOME_EST[ESTADO_PRINCIPAL]} • ${cotProd}</small>
+        <small style="color:var(--mut)">${NOME_EST[ESTADO_PRINCIPAL]} • ${cotProd} (${unidCot(cotProd)})</small>
         <div style="font-size:36px;font-weight:700;margin:4px 0">${t ? brl(t.a.valor) : '—'}</div>
         <div>${t ? `${br(t.a.data)} &nbsp; ${varH(t)}` : '<span style="color:var(--mut)">Nenhuma cotação lançada ainda.</span>'}</div>
         ${t && t.a.fonte ? `<small style="color:var(--mut)">Fonte: ${esc(t.a.fonte)}</small>` : ''}
@@ -1704,7 +1739,7 @@ async function vCotacao() {
     <div class="card" style="margin-bottom:18px">
       <h3>Outros estados</h3>
       <div class="scroll"><table>
-        <tr><th style="text-align:left">Estado</th><th>Data</th><th>Arroba</th><th>Variação</th><th>Diferença p/ ${ESTADO_PRINCIPAL}</th></tr>
+        <tr><th style="text-align:left">Estado</th><th>Data</th><th>Preço</th><th>Variação</th><th>Diferença p/ ${ESTADO_PRINCIPAL}</th></tr>
         ${outros.map(e => {
           const i = info(e);
           const d = i && t ? i.a.valor - t.a.valor : null;
@@ -1718,13 +1753,14 @@ async function vCotacao() {
     <div class="card">
       <h3>Histórico - ${NOME_EST[ESTADO_PRINCIPAL]}</h3>
       <div class="scroll"><table>
-        <tr><th>Data</th><th>Arroba</th><th style="text-align:left">Fonte</th><th></th></tr>
+        <tr><th>Data</th><th>Preço</th><th style="text-align:left">Fonte</th><th></th></tr>
         ${(porEst[ESTADO_PRINCIPAL] || []).slice(0, 15).map(x => `<tr><td>${br(x.data)}</td><td>${brl(x.valor)}</td>
           <td style="text-align:left">${esc(x.fonte)}</td>
           <td><button class="l" onclick="delCot(${x.id})">Excluir</button></td></tr>`).join('')
           || '<tr><td colspan="4" class="empty">Sem lançamentos.</td></tr>'}
       </table></div>
     </div>`;
+  if (!autoCotRodou) { autoCotRodou = true; autoCotDiaria(); }
 }
 
 async function abrirCot() {
@@ -1734,7 +1770,7 @@ async function abrirCot() {
   $('#cot-lin').innerHTML = ordemEst().map(e => `
     <div style="display:grid;grid-template-columns:1fr 140px;gap:8px;align-items:center">
       <span>${NOME_EST[e]} (${e})</span>
-      <input type="number" step="0.01" data-e="${e}" placeholder="R$ / @" aria-label="Arroba ${NOME_EST[e]}">
+      <input type="number" step="0.01" data-e="${e}" placeholder="${unidCot(cotProd)}" aria-label="Preço ${NOME_EST[e]}">
     </div>`).join('');
   $('#cot').showModal();
   await carregarCot();
@@ -1775,17 +1811,35 @@ async function delCot(id) {
   error ? alert(error.message) : vCotacao();
 }
 
+// Atualiza sozinho ao abrir a aba Cotação, no máximo 1 vez por dia
+async function autoCotDiaria() {
+  const chave = 'cot-auto-' + hoje();
+  try { if (localStorage.getItem(chave)) return; } catch (e) {}
+  try {
+    const { data, error } = await db.functions.invoke('cotacoes-auto', { body: {} });
+    if (error || !data || !data.ok) return;      // falhou: fica quieto, o botão manual continua funcionando
+    try { localStorage.setItem(chave, '1'); } catch (e) {}
+    if (tab === 'cotacao') vCotacao();
+  } catch (e) {}
+}
+
 async function atualizarCotAuto() {
   const b = $('#cot-auto');
   b.disabled = true; b.textContent = 'Buscando...';
   try {
     const { data, error } = await db.functions.invoke('cotacoes-auto', { body: {} });
     if (error) {
-      const corpo = error.context && await error.context.json().catch(() => null);
-      throw new Error((corpo && corpo.erro) || error.message);
+      let msg = error.message;
+      try {
+        if (error.context && typeof error.context.json === 'function') {
+          const c = await error.context.json();
+          if (c && c.erro) msg = c.erro + (c.diag ? '\n\n' + c.diag.join('\n') : '');
+        }
+      } catch (e) {}
+      throw new Error(msg);
     }
     if (!data || !data.ok) throw new Error((data && data.erro) || 'Falha ao buscar');
-    alert(`Cotações atualizadas: ${data.gravadas} registro(s).`);
+      alert(`Cotações atualizadas: ${data.gravadas} registro(s).\n\n` + (data.diag || []).filter(l => l.startsWith('NA/')).join('\n'));
     vCotacao();
   } catch (err) {
     alert('Não foi possível atualizar: ' + (err.message || err));
