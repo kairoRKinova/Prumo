@@ -1322,8 +1322,19 @@ async function salvarPagar() {
     const { error } = await db.from('contas_pagar').insert(rows);
     if (error) return alert(error.message);
   }
-  $('#pg').close();
-  vPagar();
+
+  const continuar = !editPgId;   // novo lançamento: continua na tela; edição: fecha
+  if (continuar) {
+    // mantém data, conta e vencimento; limpa o resto para o próximo lançamento
+    $('#pgc').value = ''; $('#pgd').value = ''; $('#pgv').value = '';
+    $('#pgf').value = 'vista'; $('#pgn').value = 2;
+    togglePgForma();             // esconde e limpa a lista de parcelas
+    $('#pgl').focus();
+  } else {
+    $('#pg').close();
+  }
+  await vPagar();
+  if (continuar) $('#pgl').focus();
 }
 
 function abrirBaixa(id) {
