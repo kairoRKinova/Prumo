@@ -163,7 +163,7 @@ async function render(forcar) {
     if (rb.error) return alert(rb.error.message);
     cats = rc.data; contas = rb.data; tCad = Date.now();
   }
-  ({ painel: vPainel, realizado: vRealizado, pagar: vPagar, receber: vReceber, cotacao: vCotacao, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados, usuarios: vUsuarios })[tab]();
+  ({ painel: vPainel, realizado: vRealizado, pagar: vPagar, receber: vReceber, cotacao: vCotacao, simulador: vSimulador, previsto: vPrevisto, categorias: vCategorias, relatorios: vRelatorios, resultados: vResultados, usuarios: vUsuarios })[tab]();
 }
 
 function itemPainel(nome, a, b, t, m, ids, tot) {
@@ -1066,7 +1066,7 @@ async function detalhe(ids, titulo) {
 }
 
 /* ---------- Usuários (somente administrador) ---------- */
-const ABAS = [['painel', 'Painel'], ['realizado', 'Conta corrente'], ['pagar', 'Contas a pagar'], ['receber', 'Contas a receber'], ['cotacao', 'Cotação'], ['previsto', 'Previsto'],
+const ABAS = [['painel', 'Painel'], ['realizado', 'Conta corrente'], ['pagar', 'Contas a pagar'], ['receber', 'Contas a receber'], ['cotacao', 'Cotação'], ['simulador', 'Simulador de venda'], ['previsto', 'Previsto'],
               ['categorias', 'Plano de contas'], ['relatorios', 'Relatórios'], ['resultados', 'Resultados']];
 let usuarios = [];
 
@@ -1878,6 +1878,99 @@ $('#cot').addEventListener('keydown', e => {
   else ord[i + 1].focus();
 });
 
+
+
+
+/* ---------- Simulador de venda ---------- */
+let simProd = 'Boi gordo', simPrecos = {};   // simPrecos: estado -> {valor, data}
+const simNum = id => parseFloat($('#' + id).value) || 0;
+const simFmt = (v, d = 2) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+async function vSimulador() {
+  $('#view').className = 'simples';
+  const un = unidCot(simProd), arroba = un === 'R$/@', saca = un.includes('saca');
+  const { data, error } = await db.from('cotacoes').select('estado,valor,data')
+    .eq('produto', simProd).order('data', { ascending: false }).limit(300);
+  if (error) return alert(error.message);
+  simPrecos = {};
+  data.forEach(x => { if (!simPrecos[x.estado]) simPrecos[x.estado] = x; });   // mais recente de cada estado
+  const estados = ordemEst().filter(e => simPrecos[e]);
+  const estIni = simPrecos[ESTADO_PRINCIPAL] ? ESTADO_PRINCIPAL : estados[0];
+  const lb = 'display:grid;gap:4px;color:var(--mut);font-size:12.5px';
+
+  $('#view').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+      <div class="card" style="padding:18px;display:grid;gap:12px;align-content:start">
+        <h3 style="padding:0;margin:0">Simulador de venda</h3>
+        <label style="${lb}">Produto
+          <select onchange="simProd=this.value;vSimulador()">
+            ${PRODUTOS_COT.map(p => `<option${p === simProd ? ' selected' : ''}>${p}</option>`).join('')}</select></label>
+        <label style="${lb}">Estado
+          <select id="sim-est" onchange="simPreco()">
+            ${estados.map(e => `<option value="${e}"${e === estIni ? ' selected' : ''}>${NOME_EST[e]} (${e})</option>`).join('')}</select></label>
+        <label style="${lb}">Preço da cotação (${un}) <span id="sim-data"></span>
+          <input id="sim-preco" type="number" step="0.01" oninput="simCalcular()"></label>
+        <label style="${lb}">${saca ? 'Quantidade de sacas' : 'Quantidade de animais'}
+          <input id="sim-qtd" type="number" min="0" step="1" value="0" oninput="simCalcular()"></label>
+        ${arroba ? `
+        <label style="${lb}">Peso vivo médio (kg)
+          <input id="sim-peso" type="number" step="0.1" value="520" oninput="simCalcular()"></label>
+        <label style="${lb}">Rendimento de carcaça (%)
+          <input id="sim-rend" type="number" step="0.1" value="52" oninput="simCalcular()"></label>` : ''}
+        <label style="${lb}">Frete (R$)
+          <input id="sim-frete" type="number" step="0.01" value="0" oninput="simCalcular()"></label>
+        <label style="${lb}">Comissão (%)
+          <input id="sim-com" type="number" step="0.01" value="0" oninput="simCalcular()"></label>
+        <label style="${lb}">Funrural (%)
+          <input id="sim-fun" type="number" step="0.01" value="1.5" oninput="simCalcular()"></label>
+      </div>
+      <div class="card" style="padding:18px;align-content:start">
+        <h3 style="padding:0;margin:0 0 10px">Resultado</h3>
+        <div id="sim-res"></div>
+      </div>
+    </div>`;
+  if (!estados.length) {
+    $('#sim-res').innerHTML = '<p class="empty">Nenhuma cotação lançada para este produto.</p>';
+    return;
+  }
+  simPreco();
+}
+
+function simPreco() {
+  const p = simPrecos[$('#sim-est').value];
+  $('#sim-preco').value = p ? p.valor : '';
+  $('#sim-data').textContent = p ? `(cotação de ${br(p.data)})` : '';
+  simCalcular();
+}
+
+function simCalcular() {
+  const un = unidCot(simProd), arroba = un === 'R$/@', saca = un.includes('saca');
+  const preco = simNum('sim-preco'), qtd = simNum('sim-qtd');
+  let base = qtd, det = '';
+  if (arroba) {
+    const apc = simNum('sim-peso') * simNum('sim-rend') / 100 / 15;
+    base = apc * qtd;
+    det = `<p>Arrobas por cabeça: <b>${simFmt(apc)}</b></p><p>Total de arrobas: <b>${simFmt(base)} @</b></p>`;
+  }
+  const bruto = base * preco;
+  const com = bruto * simNum('sim-com') / 100, fun = bruto * simNum('sim-fun') / 100, fre = simNum('sim-frete');
+  const liq = bruto - com - fun - fre;
+  const nome = saca ? 'saca' : 'cabeça';
+
+  const comp = Object.entries(simPrecos).sort((a, b) => b[1].valor - a[1].valor).map(([e, p]) =>
+    `<tr><td style="text-align:left">${NOME_EST[e]} (${e})</td><td>${brl(p.valor)}</td><td>${brl(base * p.valor)}</td></tr>`).join('');
+
+  $('#sim-res').innerHTML = `
+    ${det}
+    <p>Valor bruto: <b>${brl(bruto)}</b></p>
+    <p class="neg">Comissão: -${brl(com)}</p>
+    <p class="neg">Funrural: -${brl(fun)}</p>
+    <p class="neg">Frete: -${brl(fre)}</p>
+    <div style="font-size:24px;font-weight:700;color:var(--pri);margin:12px 0 4px">${brl(liq)}</div>
+    <small style="color:var(--mut)">valor líquido${qtd > 0 ? ` • ${brl(liq / qtd)} por ${nome}` : ''}</small>
+    <h4 style="margin:20px 0 6px">Mesma venda em cada estado (bruto, sem frete)</h4>
+    <div class="scroll"><table><tr><th style="text-align:left">Estado</th><th>Preço</th><th>Valor bruto</th></tr>${comp}</table></div>`;
+}
 
 /* ---------- Backup ---------- */
 $('#bk').onclick = async () => {
