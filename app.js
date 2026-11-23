@@ -125,6 +125,7 @@ async function init() {
   preset('ano');             // 01/09 a 31/08 do ano rural em andamento
   render();                  // abre a tela inicial
   autoCotDiaria();           // atualiza as cotações em segundo plano
+  setInterval(autoCotDiaria, COT_INTERVALO_MIN * 60000);
 }
 
 
@@ -1823,15 +1824,19 @@ async function delCot(id) {
 }
 
 // Atualiza sozinho ao abrir a aba Cotação, no máximo 1 vez por dia
+const COT_INTERVALO_MIN = 30;   // de quantos em quantos minutos pode buscar de novo
 async function autoCotDiaria() {
-  const chave = 'cot-auto-' + hoje();
-  try { if (localStorage.getItem(chave)) return; } catch (e) {}
+  const chave = 'cot-auto-ts';
+  try {
+    const ult = +localStorage.getItem(chave) || 0;
+    if (Date.now() - ult < COT_INTERVALO_MIN * 60000) return;
+  } catch (e) {}
   try {
     const { data, error } = await db.functions.invoke('cotacoes-auto', { body: {} });
-    if (error || !data || !data.ok) return;      // falhou: fica quieto, o botão manual continua funcionando
-    try { localStorage.setItem(chave, '1'); } catch (e) {}
+    if (error || !data || !data.ok) { console.warn('cotacoes-auto falhou:', error || data); return; }
+    try { localStorage.setItem(chave, String(Date.now())); } catch (e) {}
     if (tab === 'cotacao') vCotacao();
-  } catch (e) {}
+  } catch (e) { console.warn('cotacoes-auto erro:', e); }
 }
 
 async function atualizarCotAuto() {
@@ -1849,7 +1854,7 @@ async function atualizarCotAuto() {
       } catch (e) {}
       throw new Error(msg);
     }
-    if (!data || !data.ok) throw new Error((data && data.erro) || 'Falha ao buscar');
+    if (!data || !data.ok) throw new Error(((data && data.erro) || 'Falha ao buscar') + '\n\n' + ((data && data.diag) || []).filter(l => l.includes('Agrolink') || l.startsWith('NA/Boi gordo') || l.startsWith('NA/Milho') || l.startsWith('NA/Soja')).join('\n'));
       alert(`Cotações atualizadas: ${data.gravadas} registro(s).\n\n` + (data.diag || []).filter(l => l.startsWith('NA/')).join('\n'));
     vCotacao();
   } catch (err) {
