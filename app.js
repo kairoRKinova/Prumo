@@ -1679,6 +1679,7 @@ const UNID_COT = {
   'Milho': 'R$/saca 60kg', 'Soja': 'R$/saca 60kg'
 };
 const unidCot = p => UNID_COT[p] || 'R$';
+const PRODUTOS_FILTRO = [...PRODUTOS_COT, 'Soja futura'];   // só para o filtro da aba Cotação
 let cotProd = 'Boi gordo';
 let autoCotRodou = false;   // evita repetir na mesma abertura do programa
 
@@ -1706,8 +1707,30 @@ function graficoLinha(pts) {   // pts: [{data, valor}] em ordem crescente de dat
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Evolução da arroba">${g}</svg>`;
 }
 
+/* ---------- Soja futura (B3, US$/saca) ---------- */
+const MESES_NORM = ['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const usd = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'USD' });
+
+async function blocoSojaFutura() {
+  const { data, error } = await db.from('cotacoes').select('data,produto,valor')
+    .like('produto', 'Soja futura%').order('data', { ascending: false }).limit(200);
+  if (error || !data || !data.length) return '';
+  const P = {};
+  data.forEach(x => (P[x.produto] ||= []).push(x));          // da mais nova para a mais antiga
+  const ult = data[0].data;                                   // só vencimentos da última data
+  const chave = p => { const [m, a] = p.replace('Soja futura ', '').split('/'); return (+a) * 12 + MESES_NORM.indexOf(norm(m)); };
+  const linhas = Object.keys(P).filter(p => P[p][0].data === ult).sort((a, b) => chave(a) - chave(b)).map(p => {
+    const [a, b] = P[p], dif = b ? a.valor - b.valor : null;
+    return `<tr><td style="text-align:left">${esc(p.replace('Soja futura ', ''))}</td><td>${br(a.data)}</td><td>${usd(a.valor)}</td>
+      <td>${dif === null ? '—' : `<span style="color:${dif < 0 ? 'var(--bad)' : dif > 0 ? 'var(--pri)' : 'var(--mut)'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${usd(Math.abs(dif))}</span>`}</td></tr>`;
+  }).join('');
+  return `<div class="card" id="sf" style="margin-top:18px"><h3>Soja futura - B3 (US$/saca 60kg)</h3>
+    <div class="scroll"><table><tr><th style="text-align:left">Vencimento</th><th>Data</th><th>Fechamento</th><th>Variação</th></tr>${linhas}</table></div></div>`;
+}
+
 async function vCotacao() {
   $('#view').className = 'simples';
+  if (cotProd === 'Soja futura') return vSojaFutura();
   let data;
   try {
     const desde = iso(new Date(Date.now() - 60 * 864e5));
@@ -1732,7 +1755,7 @@ async function vCotacao() {
   $('#view').innerHTML = `
     <div class="row">
       <select onchange="cotProd=this.value;vCotacao()" aria-label="Produto">
-      ${PRODUTOS_COT.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
+      ${PRODUTOS_FILTRO.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
       <span class="periodo">${cotProd}: ${unidCot(cotProd)} • independe do filtro de datas</span></div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px">
@@ -1773,6 +1796,36 @@ async function vCotacao() {
       </table></div>
     </div>`;
   if (!autoCotRodou) { autoCotRodou = true; autoCotDiaria(); }
+}
+
+/* ---------- Soja futura (B3, US$/saca) ---------- */
+async function vSojaFutura() {
+  const { data, error } = await db.from('cotacoes').select('data,produto,valor')
+    .like('produto', 'Soja futura%').order('data', { ascending: false }).limit(300);
+  if (error) return alert(error.message);
+  const P = {};
+  (data || []).forEach(x => (P[x.produto] ||= []).push(x));   // da mais nova para a mais antiga
+  const ult = data && data[0] ? data[0].data : null;           // só os vencimentos da última data
+  const MES = ['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const chave = p => { const [m, a] = p.replace('Soja futura ', '').split('/'); return (+a) * 12 + MES.indexOf(norm(m)); };
+  const dolar = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'USD' });
+  const linhas = Object.keys(P).filter(p => P[p][0].data === ult).sort((a, b) => chave(a) - chave(b)).map(p => {
+    const [a, b] = P[p], dif = b ? a.valor - b.valor : null;
+    return `<tr><td style="text-align:left">${esc(p.replace('Soja futura ', ''))}</td><td>${br(a.data)}</td><td>${dolar(a.valor)}</td>
+      <td>${dif === null ? '—' : `<span style="color:${dif < 0 ? 'var(--bad)' : dif > 0 ? 'var(--pri)' : 'var(--mut)'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${dolar(Math.abs(dif))}</span>`}</td></tr>`;
+  }).join('');
+  $('#view').innerHTML = `
+    <div class="row">
+      <select onchange="cotProd=this.value;vCotacao()" aria-label="Produto">
+      ${PRODUTOS_FILTRO.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
+      <span class="periodo">Soja futura: US$/saca 60kg • B3 • independe do filtro de datas</span></div>
+    <div class="card">
+      <h3>Soja futura - vencimentos</h3>
+      <div class="scroll"><table>
+        <tr><th style="text-align:left">Vencimento</th><th>Data</th><th>Fechamento</th><th>Variação</th></tr>
+        ${linhas || '<tr><td colspan="4" class="empty">Nenhuma cotação de soja futura ainda.</td></tr>'}
+      </table></div>
+    </div>`;
 }
 
 async function abrirCot() {
