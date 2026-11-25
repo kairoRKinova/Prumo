@@ -1799,32 +1799,48 @@ async function vCotacao() {
 }
 
 /* ---------- Soja futura (B3, US$/saca) ---------- */
+const FATOR_DOLAR = 1000;   // a B3 cota o dólar futuro em R$ por US$ 1.000; dividir por 1000 dá R$ por US$
+
 async function vSojaFutura() {
-  const { data, error } = await db.from('cotacoes').select('data,produto,valor')
-    .like('produto', 'Soja futura%').order('data', { ascending: false }).limit(300);
-  if (error) return alert(error.message);
-  const P = {};
-  (data || []).forEach(x => (P[x.produto] ||= []).push(x));   // da mais nova para a mais antiga
-  const ult = data && data[0] ? data[0].data : null;           // só os vencimentos da última data
+  const [rs, rd] = await Promise.all([
+    db.from('cotacoes').select('data,produto,valor').like('produto', 'Soja futura%').order('data', { ascending: false }).limit(300),
+    db.from('cotacoes').select('data,produto,valor').like('produto', 'Dólar futuro%').order('data', { ascending: false }).limit(60)
+  ]);
+  if (rs.error) return alert(rs.error.message);
+  const soja = rs.data || [], dol = rd.data || [];
   const MES = ['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-  const chave = p => { const [m, a] = p.replace('Soja futura ', '').split('/'); return (+a) * 12 + MES.indexOf(norm(m)); };
-  const dolar = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'USD' });
-  const linhas = Object.keys(P).filter(p => P[p][0].data === ult).sort((a, b) => chave(a) - chave(b)).map(p => {
-    const [a, b] = P[p], dif = b ? a.valor - b.valor : null;
-    return `<tr><td style="text-align:left">${esc(p.replace('Soja futura ', ''))}</td><td>${br(a.data)}</td><td>${dolar(a.valor)}</td>
-      <td>${dif === null ? '—' : `<span style="color:${dif < 0 ? 'var(--bad)' : dif > 0 ? 'var(--pri)' : 'var(--mut)'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${dolar(Math.abs(dif))}</span>`}</td></tr>`;
-  }).join('');
+  const chave = (p, pref) => { const [m, a] = p.replace(pref, '').split('/'); return (+a) * 12 + MES.indexOf(norm(m)); };
+  const usd = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'USD' });
+
+  const P = {};
+  soja.forEach(x => (P[x.produto] ||= []).push(x));
+  const ult = soja[0] ? soja[0].data : null;                       // só os vencimentos da última data
+  const ultD = dol[0] ? dol[0].data : null;
+  const dolares = dol.filter(x => x.data === ultD).map(x => ({
+    k: chave(x.produto, 'Dólar futuro '), nome: x.produto.replace('Dólar futuro ', ''), taxa: x.valor / FATOR_DOLAR }));
+
+  const linhas = Object.keys(P).filter(p => P[p][0].data === ult)
+    .sort((a, b) => chave(a, 'Soja futura ') - chave(b, 'Soja futura ')).map(p => {
+      const a = P[p][0], k = chave(p, 'Soja futura ');
+      const d = dolares.length ? dolares.reduce((m, x) => Math.abs(x.k - k) < Math.abs(m.k - k) ? x : m) : null;   // mesmo mês ou o mais próximo
+      const exato = d && d.k === k;
+      return `<tr><td style="text-align:left">${esc(p.replace('Soja futura ', ''))}</td><td>${usd(a.valor)}</td>
+        <td>${d ? simFmt(d.taxa, 4) + (exato ? '' : ` <small style="color:var(--acc)">(${esc(d.nome)})</small>`) : '—'}</td>
+        <td><b>${d ? brl(a.valor * d.taxa) : '—'}</b></td></tr>`;
+    }).join('');
+
   $('#view').innerHTML = `
     <div class="row">
       <select onchange="cotProd=this.value;vCotacao()" aria-label="Produto">
       ${PRODUTOS_FILTRO.map(p => `<option${p === cotProd ? ' selected' : ''}>${p}</option>`).join('')}</select>
-      <span class="periodo">Soja futura: US$/saca 60kg • B3 • independe do filtro de datas</span></div>
+      <span class="periodo">Soja futura B3 em ${ult ? br(ult) : '—'} • dólar futuro B3 em ${ultD ? br(ultD) : '—'} • independe do filtro de datas</span></div>
     <div class="card">
       <h3>Soja futura - vencimentos</h3>
       <div class="scroll"><table>
-        <tr><th style="text-align:left">Vencimento</th><th>Data</th><th>Fechamento</th><th>Variação</th></tr>
+        <tr><th style="text-align:left">Vencimento</th><th>Soja (US$/saca)</th><th>Dólar futuro (R$/US$)</th><th>Preço em R$/saca</th></tr>
         ${linhas || '<tr><td colspan="4" class="empty">Nenhuma cotação de soja futura ainda.</td></tr>'}
       </table></div>
+      <p style="color:var(--mut);margin:10px 0 0">Preço em R$ = soja em US$ × dólar futuro do mesmo mês. Quando não há dólar para o mês, usa-se o mais próximo (mês marcado entre parênteses). É um valor teórico, sem prêmio nem frete de porto.</p>
     </div>`;
 }
 
